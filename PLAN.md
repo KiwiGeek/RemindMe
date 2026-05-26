@@ -101,7 +101,8 @@ plus internal routes for the webhook and email-action callbacks.
 | `DELETE`| `/api/reminders/:id` | Soft delete |
 | `POST` | `/api/reminders/preview` | Preview next N fire times + sample rendered email |
 | `GET`  | `/api/reminders/template-variables` | Reference list for the form |
-| `GET`  | `/r/:token` | Email-action landing (snooze/skip/done/unsubscribe) |
+| `GET`  | `/r/:token` | Email-action landing — confirm pages, magic-link sign-in |
+| `POST` | `/r/:token` | Apply confirmed action; RFC 8058 one-click List-Unsubscribe |
 | `POST` | `/api/webhooks/mailgun` | Bounce / complaint / unsubscribe events |
 | `GET`  | `/*` | SPA shell + static assets |
 
@@ -359,8 +360,20 @@ WCAG AA contrast.
    `remaining_count`, marks completed when exhausted, and retries
    failed sends on the next tick. 50-reminder per-tick cap so a backlog
    can't blow CPU budget. 9 scheduler tests; 76 total passing.
-5. **M4 — Email actions.** Snooze / skip / mark done / manage page; action
-   token plumbing; List-Unsubscribe header.
+5. ~~**M4 — Email actions.**~~ ✅ HMAC-signed, kind-tagged action tokens
+   (`fa.` fire-actions and `ml.` magic-links, 30-day TTL) generated per
+   firing and embedded in the outgoing email's footer. `GET/POST
+   /r/:token` handles snooze (×5 durations), skip-next (RRULE-aware),
+   mark-done (with two-step confirm page), per-reminder unsubscribe,
+   and magic-link sign-in for the "Manage all your reminders" footer
+   link. Single-use enforced via `reminder_fires.action_consumed_at`
+   so reusing *any* token from a given fire reports "already actioned"
+   even if it's a different op. RFC 8058 `List-Unsubscribe` +
+   `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers point
+   mail clients at the per-fire unsub action so Gmail/Apple Mail render
+   their native Unsubscribe button. 19 new tests (token round-trips,
+   prefix collision, tampering, expiry, every op, idempotency, magic
+   link sign-in + suspended-user rejection); 94 total passing.
 6. **M5 — Bounce handling.** Mailgun webhook receiver, suspension logic,
    self-recovery flow.
 7. **M6 — Polish & launch.** Custom domain DNS, production secrets,

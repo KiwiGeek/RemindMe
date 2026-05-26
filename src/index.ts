@@ -7,6 +7,7 @@ import { runScheduledTick } from '~/lib/scheduler';
 import { auth } from '~/routes/auth';
 import { healthz } from '~/routes/healthz';
 import { me } from '~/routes/me';
+import { r } from '~/routes/r';
 import { remindersRoute } from '~/routes/reminders';
 
 const app = new Hono<AppBindings>();
@@ -21,6 +22,7 @@ app.route('/api/healthz', healthz);
 app.route('/api/auth', auth);
 app.route('/api/me', me);
 app.route('/api/reminders', remindersRoute);
+app.route('/r', r);
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

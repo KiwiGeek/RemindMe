@@ -271,7 +271,11 @@ describe('runScheduledTick', () => {
     expect(capturedBody).toContain('Trash day (Monday)');
     expect(capturedBody).toContain('Bins out');
     expect(capturedBody).toContain('25 May 2026');
-    expect(capturedBody).toContain('Manage your reminders');
+    expect(capturedBody).toContain('Manage all your reminders');
+    // Each email gets snooze/skip/done/unsub + magic-link URLs.
+    expect(capturedBody).toMatch(/\/r\/fa\.[A-Za-z0-9_-]+\./);
+    expect(capturedBody).toMatch(/\/r\/ml\.[A-Za-z0-9_-]+\./);
+    expect(capturedBody).toMatch(/List-Unsubscribe/);
     expect(capturedBody).toMatch(/Message-Id[\s\S]*reminder-\d+-/);
   });
 });

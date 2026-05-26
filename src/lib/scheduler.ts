@@ -26,7 +26,8 @@ import {
   users,
 } from '~/db/schema';
 import type { Env } from '~/env';
-import { buildReminderEmail } from '~/lib/emails/reminder';
+import { FIRE_ACTIONS, type FireAction, signFireAction, signMagicLink } from '~/lib/actionToken';
+import { type ReminderEmailLinks, buildReminderEmail } from '~/lib/emails/reminder';
 import { MailgunClient, MailgunError } from '~/lib/mailgun';
 import { nextFires } from '~/lib/recurrence';
 import { renderReminder } from '~/lib/render';
@@ -121,7 +122,7 @@ async function dispatchOne(
   }
 
   const claim = await claimFire(db, reminder.id, fireAt, 'queued', null);
-  if (claim === 'already_sent') return 'skipped';
+  if (claim.status === 'already_sent') return 'skipped';
 
   const occurrenceNumber = (await countSentFires(db, reminder.id)) + 1;
   const willHaveMore =
@@ -141,7 +142,8 @@ async function dispatchOne(
     userEmail: user.email,
   });
 
-  const email = buildReminderEmail({ rendered, siteOrigin: env.SITE_ORIGIN });
+  const links = await buildLinks(env, reminder.id, claim.fireId, user.id);
+  const email = buildReminderEmail({ rendered, links });
   const messageId = `reminder-${reminder.id}-${encodeURIComponent(fireAt)}@${env.MAILGUN_DOMAIN}`;
 
   try {
@@ -152,6 +154,7 @@ async function dispatchOne(
       html: email.html,
       tags: ['reminder'],
       messageId,
+      listUnsubscribe: email.listUnsubscribe,
     });
     await db
       .update(reminderFires)
@@ -180,13 +183,18 @@ async function dispatchOne(
   }
 }
 
+interface ClaimResult {
+  status: 'claimed' | 'already_sent';
+  fireId: number;
+}
+
 async function claimFire(
   db: ReturnType<typeof getDb>,
   reminderId: number,
   fireAt: string,
   status: 'queued' | 'skipped',
   error: string | null,
-): Promise<'claimed' | 'already_sent'> {
+): Promise<ClaimResult> {
   // Raw SQL because the conditional UPDATE clause maps cleanly to SQLite's
   // ON CONFLICT DO UPDATE ... WHERE form and Drizzle's setWhere helper isn't
   // available on all installed versions.
@@ -198,12 +206,42 @@ async function claimFire(
       WHERE reminder_fires.status IN ('queued', 'failed')
   `);
   const after = await db
-    .select({ status: reminderFires.status })
+    .select({ id: reminderFires.id, status: reminderFires.status })
     .from(reminderFires)
     .where(and(eq(reminderFires.reminderId, reminderId), eq(reminderFires.fireAt, fireAt)))
     .limit(1);
-  if (after[0]?.status === 'sent') return 'already_sent';
-  return 'claimed';
+  const row = after[0];
+  if (!row) throw new Error('claim_fire_missing_row');
+  return {
+    status: row.status === 'sent' ? 'already_sent' : 'claimed',
+    fireId: row.id,
+  };
+}
+
+async function buildLinks(
+  env: Env,
+  reminderId: number,
+  fireId: number,
+  userId: number,
+): Promise<ReminderEmailLinks> {
+  const origin = env.SITE_ORIGIN;
+  const fireActions = {} as Record<FireAction, string>;
+  await Promise.all(
+    FIRE_ACTIONS.map(async (op) => {
+      const token = await signFireAction(env.ACTION_TOKEN_SECRET, {
+        rid: reminderId,
+        fid: fireId,
+        op,
+      });
+      fireActions[op] = `${origin}/r/${token}`;
+    }),
+  );
+  const magicToken = await signMagicLink(env.ACTION_TOKEN_SECRET, userId);
+  return {
+    fireActions,
+    manageUrl: `${origin}/r/${magicToken}`,
+    listUnsubscribeUrl: fireActions.unsub,
+  };
 }
 
 async function countSentFires(db: ReturnType<typeof getDb>, reminderId: number): Promise<number> {

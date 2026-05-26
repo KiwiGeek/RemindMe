@@ -8,10 +8,13 @@ contributor conventions.
 
 ## Status
 
-**M3 — Scheduler shipped.** Auth, full reminders CRUD, and a cron-driven
-sender are all live on `main`. The scheduler runs `*/5 * * * *` with a
-6-minute look-ahead so reminders arrive on or slightly before their
-scheduled minute, never late.
+**M4 — Email actions shipped.** Outgoing reminders carry signed one-click
+links for snooze (5 durations), skip-next, mark-done (with confirm step),
+per-series unsubscribe, and a magic-link "Manage all your reminders"
+footer link. RFC 8058 `List-Unsubscribe` headers wire Gmail/Apple Mail's
+native Unsubscribe button to the same per-fire action. Tokens are
+HMAC-signed, kind-tagged (`fa.` / `ml.`), single-use via
+`reminder_fires.action_consumed_at`, 30-day TTL.
 
 ## Stack
 
