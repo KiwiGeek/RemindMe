@@ -87,6 +87,13 @@ jobs:
       - name: Deploy (apply remote D1 migrations + push worker)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Pin the target account so wrangler doesn't try to enumerate
+          # `/memberships` to discover it — that endpoint requires a
+          # `User → Memberships → Read` token permission we deliberately
+          # don't grant. With `CLOUDFLARE_ACCOUNT_ID` set the token only
+          # needs the resource-edit scopes (Workers/D1/KV) documented in
+          # the README.
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # `wrangler d1 migrations apply --remote` prompts interactively
           # outside CI; GitHub Actions sets CI=true automatically, which
           # wrangler treats as non-interactive. We set it again explicitly

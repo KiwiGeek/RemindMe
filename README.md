@@ -179,11 +179,15 @@ queue and run in order.
 
 ### One-time secret setup
 
-The deploy job needs a Cloudflare API token in the GitHub repo secrets
-as `CLOUDFLARE_API_TOKEN`.
+The deploy job needs two GitHub repo secrets:
 
-1. Cloudflare dashboard → **My Profile → API Tokens → Create Token →
-   Custom token**. Give it these permissions (all *Edit* unless noted):
+| Secret | Value | Where to find it |
+| --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | A custom API token (see below) | Cloudflare dashboard → **My Profile → API Tokens** |
+| `CLOUDFLARE_ACCOUNT_ID` | 32-char hex string | Cloudflare dashboard home → right sidebar |
+
+1. Create the API token at **My Profile → API Tokens → Create Token →
+   Custom token**. Permissions (all *Edit* unless noted):
    - **Account** · Workers Scripts · Edit
    - **Account** · D1 · Edit
    - **Account** · Workers KV Storage · Edit
@@ -194,9 +198,16 @@ as `CLOUDFLARE_API_TOKEN`.
 
    Scope the token to your single account and zone so a leak is bounded.
 
+   > **Why we set `CLOUDFLARE_ACCOUNT_ID` instead of granting `User →
+   > Memberships → Read`:** without an account ID, wrangler probes
+   > `/memberships` to discover which account to deploy to, and the
+   > memberships endpoint needs its own token permission. Pinning the
+   > account ID via env var lets wrangler skip the probe entirely and
+   > keeps the token scoped to just what it needs to write.
+
 2. GitHub repo → **Settings → Secrets and variables → Actions → New
-   repository secret**. Name it `CLOUDFLARE_API_TOKEN`, paste the value,
-   save.
+   repository secret**. Add both `CLOUDFLARE_API_TOKEN` and
+   `CLOUDFLARE_ACCOUNT_ID`.
 
 3. (Optional) Repo → **Settings → Environments → New environment →
    `production`**. The workflow already references this environment so
@@ -204,7 +215,7 @@ as `CLOUDFLARE_API_TOKEN`.
    Adding a required reviewer here turns auto-deploy into "deploy on
    approval" without any workflow change.
 
-After the secret exists, the next push to `main` deploys automatically.
+After both secrets exist, the next push to `main` deploys automatically.
 If you ever need to ship from a feature branch (e.g. for a hotfix that
 hasn't been merged), `npm run deploy` from your laptop still works
 exactly as before — auto-deploy is additive, not a replacement.
