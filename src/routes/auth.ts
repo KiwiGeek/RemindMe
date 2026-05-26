@@ -78,10 +78,19 @@ export const auth = new Hono<AppBindings>()
     });
 
     const mg = new MailgunClient(c.env);
+
+    // User-initiated send: pre-clear any prior Mailgun suppression so a
+    // previously-bounced address can recover. This is a *best-effort* step —
+    // if it fails (wrong API scope, transient network, etc.) we still want
+    // to attempt the actual OTP send below for the 99% case where the
+    // address isn't suppressed.
     try {
-      // User-initiated send: pre-clear any prior Mailgun suppression so a
-      // previously-bounced address can recover. See PLAN.md §14.
       await mg.clearSuppressions(email);
+    } catch (err) {
+      console.warn('auth.request: clearSuppressions failed; proceeding to send', err);
+    }
+
+    try {
       const { subject, text, html } = renderOtpEmail({
         appName: c.env.APP_NAME,
         code,
@@ -95,7 +104,7 @@ export const auth = new Hono<AppBindings>()
         tags: ['otp'],
       });
     } catch (err) {
-      console.error('auth.request mailgun send failed', err);
+      console.error('auth.request: mailgun send failed', err);
       // Still respond 204 — same shape as success — to keep enumeration shut.
     }
 

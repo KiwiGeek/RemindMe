@@ -88,6 +88,34 @@ describe('POST /api/auth/request', () => {
     expect(res.status).toBe(400);
   });
 
+  it('still sends the OTP even when suppression-clearing fails', async () => {
+    // Simulate the production failure mode the user hit: clearSuppressions
+    // returns 401 (wrong API key scope), but the message send itself works.
+    const captured: { value: string | null } = { value: null };
+    const pool = fetchMock.get(MAILGUN_BASE);
+    for (let i = 0; i < 3; i++) {
+      pool
+        .intercept({
+          path: /^\/v3\/penman\.dev\/(bounces|unsubscribes|complaints)\//,
+          method: 'DELETE',
+        })
+        .reply(401, '{"Error":"unauthorized"}');
+    }
+    pool.intercept({ path: '/v3/example.com/messages', method: 'POST' }).reply(
+      200,
+      (opts) => {
+        captured.value = bodyToString(opts.body);
+        return '{"id":"<x>","message":"Queued"}';
+      },
+      { headers: { 'content-type': 'application/json' } },
+    );
+
+    const res = await postJson('/api/auth/request', { email: 'fred@example.com' });
+    expect(res.status).toBe(204);
+    expect(captured.value).toMatch(/fred@example\.com/);
+    expect(extractCode(captured.value)).toMatch(/^\d{6}$/);
+  });
+
   it('rate-limits a single email after 5 requests in the window', async () => {
     for (let i = 0; i < 5; i++) mockMailgunSendOnce();
     const email = `rl-${crypto.randomUUID()}@example.com`;
