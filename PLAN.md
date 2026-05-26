@@ -307,6 +307,14 @@ WCAG AA contrast.
 - All user-supplied Markdown sanitised before email render (no `<script>`,
   no `javascript:` URLs).
 - Rate limits on auth + create-reminder endpoints.
+- Admin allow-list lives in `wrangler.toml`'s `ADMIN_EMAILS` var, not in
+  D1. Escalating to admin requires shipping a new Worker version (which
+  requires already controlling the deploy pipeline); a D1-stored flag
+  would have grown the blast radius of any DB write vuln to include
+  admin escalation.
+- Admin routes never impersonate. The admin's session stays the admin's
+  session; the target user_id comes only from `:id` in the URL; every
+  admin mutation writes to `audit_log`.
 
 ## 11. Local & Deploy Workflow
 
@@ -374,9 +382,22 @@ WCAG AA contrast.
    their native Unsubscribe button. 19 new tests (token round-trips,
    prefix collision, tampering, expiry, every op, idempotency, magic
    link sign-in + suspended-user rejection); 94 total passing.
-6. **M5 — Bounce handling.** Mailgun webhook receiver, suspension logic,
+6. ~~**M4.5 — Admin console.**~~ ✅ `ADMIN_EMAILS` env var (CSV, case-
+   insensitive) gates `/api/admin/*`. New `requireAdmin` middleware
+   resolves to 403 (not 404) so admins debugging production can tell the
+   route exists. Admin routes never look at the session for the target —
+   `:id` in the URL is the only source of truth, so a stale tab can't
+   cross-edit. Admins can list/search users (`?q=`), create users (with
+   `tz_confirmed=0` so the OTP claim flow re-prompts on first sign-in),
+   change a target's timezone, and full CRUD + preview reminders on
+   behalf of any user. Every mutation writes an `admin_*` row to
+   `audit_log` with `{admin_user_id, target_user_id, reminder_id?,
+   change?}`. SPA exposes the admin console behind a header button that
+   only renders when `/api/me` returns `isAdmin: true`. 18 new tests; 112
+   total passing.
+7. **M5 — Bounce handling.** Mailgun webhook receiver, suspension logic,
    self-recovery flow.
-7. **M6 — Polish & launch.** Custom domain DNS, production secrets,
+8. **M6 — Polish & launch.** Custom domain DNS, production secrets,
    accessibility pass, README, deploy.
 
 ## 14. Resolved Decisions Log

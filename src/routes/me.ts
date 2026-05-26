@@ -4,8 +4,9 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { getDb } from '~/db/client';
-import { users } from '~/db/schema';
-import type { AppBindings } from '~/env';
+import { type User, users } from '~/db/schema';
+import type { AppBindings, Env } from '~/env';
+import { isAdminEmail } from '~/lib/admin';
 import { requireAuth } from '~/lib/auth';
 
 /**
@@ -30,6 +31,19 @@ const patchBody = z.object({
   tzConfirmed: z.boolean().optional(),
 });
 
+export function presentUser(env: Env, user: User) {
+  return {
+    id: user.id,
+    email: user.email,
+    timezone: user.timezone,
+    tzConfirmed: user.tzConfirmed === 1,
+    status: user.status,
+    isAdmin: isAdminEmail(env, user.email),
+  };
+}
+
+export { isValidTimeZone };
+
 export const me = new Hono<AppBindings>()
   .use('*', requireAuth)
   .get('/', async (c) => {
@@ -38,15 +52,7 @@ export const me = new Hono<AppBindings>()
     const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     const user = rows[0];
     if (!user) throw new HTTPException(401, { message: 'unauthorized' });
-    return c.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        timezone: user.timezone,
-        tzConfirmed: user.tzConfirmed === 1,
-        status: user.status,
-      },
-    });
+    return c.json({ user: presentUser(c.env, user) });
   })
   .patch('/', zValidator('json', patchBody), async (c) => {
     const { timezone, tzConfirmed } = c.req.valid('json');
@@ -66,13 +72,5 @@ export const me = new Hono<AppBindings>()
     const updated = await db.update(users).set(patch).where(eq(users.id, userId)).returning();
     const user = updated[0];
     if (!user) throw new HTTPException(404, { message: 'not_found' });
-    return c.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        timezone: user.timezone,
-        tzConfirmed: user.tzConfirmed === 1,
-        status: user.status,
-      },
-    });
+    return c.json({ user: presentUser(c.env, user) });
   });

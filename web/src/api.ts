@@ -4,7 +4,11 @@ export interface CurrentUser {
   timezone: string;
   tzConfirmed: boolean;
   status: 'active' | 'suspended';
+  isAdmin: boolean;
 }
+
+/** Admin-facing view of any user. Same shape as `CurrentUser` — see `presentUser`. */
+export type AdminUser = CurrentUser;
 
 interface ErrorBody {
   error?: string;
@@ -134,6 +138,45 @@ export const api = {
     }),
   templateVariables: () =>
     call<{ variables: TemplateVariable[] }>('/api/reminders/template-variables'),
+
+  // ---- admin --------------------------------------------------------------
+  adminListUsers: (q?: string) =>
+    call<{ users: AdminUser[] }>(`/api/admin/users${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  adminGetUser: (id: number) => call<{ user: AdminUser }>(`/api/admin/users/${id}`),
+  adminCreateUser: (input: { email: string; timezone?: string }) =>
+    call<{ user: AdminUser }>('/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  adminUpdateUser: (id: number, patch: { timezone?: string }) =>
+    call<{ user: AdminUser }>(`/api/admin/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
+  adminListReminders: (userId: number) =>
+    call<{ reminders: Reminder[] }>(`/api/admin/users/${userId}/reminders`),
+  adminCreateReminder: (userId: number, input: ReminderInput) =>
+    call<{ reminder: Reminder }>(`/api/admin/users/${userId}/reminders`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  adminUpdateReminder: (
+    userId: number,
+    rid: number,
+    patch: Partial<ReminderInput> & { status?: ReminderStatus },
+  ) =>
+    call<{ reminder: Reminder }>(`/api/admin/users/${userId}/reminders/${rid}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  adminDeleteReminder: (userId: number, rid: number) =>
+    call<void>(`/api/admin/users/${userId}/reminders/${rid}`, { method: 'DELETE' }),
+  adminPreviewReminder: (userId: number, input: PreviewInput) =>
+    call<PreviewResult>(`/api/admin/users/${userId}/reminders/preview`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
 };
 
 export function detectBrowserTimezone(): string {

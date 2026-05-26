@@ -10,6 +10,7 @@ import { renderOtpEmail } from '~/lib/emails/otp';
 import { MailgunClient } from '~/lib/mailgun';
 import { rateLimit } from '~/lib/ratelimit';
 import { clearSessionCookie, signSession, writeSessionCookie } from '~/lib/session';
+import { presentUser } from '~/routes/me';
 
 const OTP_TTL_SECONDS = 10 * 60;
 const OTP_MAX_ATTEMPTS = 5;
@@ -164,15 +165,7 @@ export const auth = new Hono<AppBindings>()
     const token = await signSession(c.env.SESSION_SECRET, user.id);
     writeSessionCookie(c, token);
 
-    return c.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        timezone: user.timezone,
-        tzConfirmed: user.tzConfirmed === 1,
-        status: user.status,
-      },
-    });
+    return c.json({ user: presentUser(c.env, user) });
   })
   .post('/logout', (c) => {
     clearSessionCookie(c);

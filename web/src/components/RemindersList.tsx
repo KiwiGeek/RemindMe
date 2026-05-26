@@ -1,23 +1,46 @@
 import { DateTime } from 'luxon';
 import { useState } from 'preact/hooks';
-import { type Reminder, api } from '../api';
+import { type Reminder, type ReminderStatus, api } from '../api';
+
+/** Same shape as the admin/self distinction in `ReminderForm`. */
+export interface RemindersListClient {
+  setStatus: (id: number, status: ReminderStatus) => Promise<unknown>;
+  remove: (id: number) => Promise<unknown>;
+}
+
+export const selfListClient: RemindersListClient = {
+  setStatus: (id, status) => api.updateReminder(id, { status }),
+  remove: (id) => api.deleteReminder(id),
+};
+
+export function adminListClient(userId: number): RemindersListClient {
+  return {
+    setStatus: (id, status) => api.adminUpdateReminder(userId, id, { status }),
+    remove: (id) => api.adminDeleteReminder(userId, id),
+  };
+}
 
 interface Props {
   reminders: Reminder[];
   userTimezone: string;
   onEdit: (r: Reminder) => void;
   onChanged: () => void;
+  client?: RemindersListClient;
 }
 
-export function RemindersList({ reminders, userTimezone, onEdit, onChanged }: Props) {
+export function RemindersList({
+  reminders,
+  userTimezone,
+  onEdit,
+  onChanged,
+  client = selfListClient,
+}: Props) {
   const [busyId, setBusyId] = useState<number | null>(null);
 
   async function togglePause(r: Reminder) {
     setBusyId(r.id);
     try {
-      await api.updateReminder(r.id, {
-        status: r.status === 'paused' ? 'active' : 'paused',
-      });
+      await client.setStatus(r.id, r.status === 'paused' ? 'active' : 'paused');
       onChanged();
     } finally {
       setBusyId(null);
@@ -28,7 +51,7 @@ export function RemindersList({ reminders, userTimezone, onEdit, onChanged }: Pr
     if (!confirm(`Delete "${r.title}"? This cannot be undone.`)) return;
     setBusyId(r.id);
     try {
-      await api.deleteReminder(r.id);
+      await client.remove(r.id);
       onChanged();
     } finally {
       setBusyId(null);

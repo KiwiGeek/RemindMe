@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import {
   ApiError,
   type CurrentUser,
+  type PreviewInput,
   type PreviewResult,
   type Reminder,
   type ReminderInput,
@@ -10,11 +11,38 @@ import {
 import { useDebounced } from '../hooks/useDebounced';
 import { RecurrencePicker } from './RecurrencePicker';
 
+/**
+ * The form is agnostic about whether it's editing the signed-in user's own
+ * reminders or — when in admin mode — someone else's. Callers inject the
+ * three methods that differ between the two flows.
+ */
+export interface ReminderFormClient {
+  preview: (input: PreviewInput) => Promise<PreviewResult>;
+  create: (input: ReminderInput) => Promise<{ reminder: Reminder }>;
+  update: (id: number, patch: Partial<ReminderInput>) => Promise<{ reminder: Reminder }>;
+}
+
+export const selfClient: ReminderFormClient = {
+  preview: api.previewReminder,
+  create: api.createReminder,
+  update: api.updateReminder,
+};
+
+export function adminClient(userId: number): ReminderFormClient {
+  return {
+    preview: (input) => api.adminPreviewReminder(userId, input),
+    create: (input) => api.adminCreateReminder(userId, input),
+    update: (id, patch) => api.adminUpdateReminder(userId, id, patch),
+  };
+}
+
 interface Props {
-  user: CurrentUser;
+  user: Pick<CurrentUser, 'timezone'>;
   existing: Reminder | null;
   onSaved: (r: Reminder) => void;
   onCancel: () => void;
+  /** Defaults to `selfClient`. Pass `adminClient(id)` to admin-edit another user. */
+  client?: ReminderFormClient;
 }
 
 interface FormState {
@@ -27,7 +55,7 @@ interface FormState {
   endsAfterCount: string;
 }
 
-function initialState(user: CurrentUser, existing: Reminder | null): FormState {
+function initialState(user: Pick<CurrentUser, 'timezone'>, existing: Reminder | null): FormState {
   if (existing) {
     return {
       title: existing.title,
@@ -58,7 +86,7 @@ function defaultDtstart(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function ReminderForm({ user, existing, onSaved, onCancel }: Props) {
+export function ReminderForm({ user, existing, onSaved, onCancel, client = selfClient }: Props) {
   const [state, setState] = useState<FormState>(() => initialState(user, existing));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,8 +97,8 @@ export function ReminderForm({ user, existing, onSaved, onCancel }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .previewReminder({
+    client
+      .preview({
         title: debouncedPreviewInput.title,
         bodyMd: debouncedPreviewInput.bodyMd,
         rrule: debouncedPreviewInput.rrule,
@@ -91,7 +119,7 @@ export function ReminderForm({ user, existing, onSaved, onCancel }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [debouncedPreviewInput]);
+  }, [debouncedPreviewInput, client]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setState((prev) => ({ ...prev, [key]: value }));
@@ -116,8 +144,8 @@ export function ReminderForm({ user, existing, onSaved, onCancel }: Props) {
         ends,
       };
       const res = existing
-        ? await api.updateReminder(existing.id, payload)
-        : await api.createReminder(payload);
+        ? await client.update(existing.id, payload)
+        : await client.create(payload);
       onSaved(res.reminder);
     } catch (err) {
       setError(humaniseSaveError(err));

@@ -8,11 +8,13 @@ interface Props {
   user: CurrentUser;
   onUserChanged: (user: CurrentUser) => void;
   onLoggedOut: () => void;
+  /** Provided only when the signed-in user is an admin. */
+  onEnterAdmin?: () => void;
 }
 
 type Mode = { kind: 'list' } | { kind: 'new' } | { kind: 'edit'; reminder: Reminder };
 
-export function Dashboard({ user, onUserChanged, onLoggedOut }: Props) {
+export function Dashboard({ user, onUserChanged, onLoggedOut, onEnterAdmin }: Props) {
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [reminders, setReminders] = useState<Reminder[] | null>(null);
@@ -48,6 +50,15 @@ export function Dashboard({ user, onUserChanged, onLoggedOut }: Props) {
         <h1 class="text-2xl font-semibold tracking-tight">Remind Me</h1>
         <div class="flex items-center gap-3 text-sm">
           <span class="text-zinc-600 dark:text-zinc-400">{user.email}</span>
+          {onEnterAdmin && (
+            <button
+              type="button"
+              onClick={onEnterAdmin}
+              class="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
+            >
+              Admin
+            </button>
+          )}
           <button
             type="button"
             disabled={busy}

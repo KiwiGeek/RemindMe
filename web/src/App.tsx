@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, type CurrentUser, api } from './api';
+import { AdminConsole } from './components/AdminConsole';
 import { Dashboard } from './components/Dashboard';
 import { SignIn } from './components/SignIn';
+
+type View = 'dashboard' | 'admin';
 
 type State =
   | { kind: 'loading' }
   | { kind: 'signed_out' }
-  | { kind: 'signed_in'; user: CurrentUser };
+  | { kind: 'signed_in'; user: CurrentUser; view: View };
 
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
@@ -16,7 +19,7 @@ export function App() {
     api
       .me()
       .then(({ user }) => {
-        if (!cancelled) setState({ kind: 'signed_in', user });
+        if (!cancelled) setState({ kind: 'signed_in', user, view: 'dashboard' });
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -40,14 +43,31 @@ export function App() {
   }
 
   if (state.kind === 'signed_out') {
-    return <SignIn onSignedIn={(user) => setState({ kind: 'signed_in', user })} />;
+    return (
+      <SignIn onSignedIn={(user) => setState({ kind: 'signed_in', user, view: 'dashboard' })} />
+    );
   }
 
-  return (
-    <Dashboard
-      user={state.user}
-      onUserChanged={(user) => setState({ kind: 'signed_in', user })}
-      onLoggedOut={() => setState({ kind: 'signed_out' })}
-    />
-  );
+  if (state.view === 'admin') {
+    return (
+      <AdminConsole
+        admin={state.user}
+        onExit={() => setState({ ...state, view: 'dashboard' })}
+        onLoggedOut={() => setState({ kind: 'signed_out' })}
+      />
+    );
+  }
+
+  const signedInState = state;
+  const dashboardProps = {
+    user: signedInState.user,
+    onUserChanged: (user: CurrentUser) =>
+      setState({ kind: 'signed_in', user, view: signedInState.view }),
+    onLoggedOut: () => setState({ kind: 'signed_out' }),
+    ...(signedInState.user.isAdmin
+      ? { onEnterAdmin: () => setState({ ...signedInState, view: 'admin' as const }) }
+      : {}),
+  };
+
+  return <Dashboard {...dashboardProps} />;
 }

@@ -27,7 +27,7 @@ const endsSchema = z
   })
   .default({ kind: 'never' });
 
-const createBody = z.object({
+export const createReminderBody = z.object({
   title: z.string().min(1).max(MAX_TITLE_LEN),
   bodyMd: z.string().max(MAX_BODY_LEN).default(''),
   rrule: z.string().min(3).max(1000),
@@ -36,7 +36,7 @@ const createBody = z.object({
   ends: endsSchema,
 });
 
-const patchBody = z
+export const patchReminderBody = z
   .object({
     title: z.string().min(1).max(MAX_TITLE_LEN).optional(),
     bodyMd: z.string().max(MAX_BODY_LEN).optional(),
@@ -58,7 +58,7 @@ const patchBody = z
     { message: 'no_changes' },
   );
 
-const previewBody = z.object({
+export const previewReminderBody = z.object({
   title: z.string().max(MAX_TITLE_LEN).default(''),
   bodyMd: z.string().max(MAX_BODY_LEN).default(''),
   rrule: z.string().min(3).max(1000),
@@ -67,7 +67,7 @@ const previewBody = z.object({
   count: z.number().int().positive().max(20).default(PREVIEW_FIRES),
 });
 
-function computeInitialFire(rrule: string, dtstart: string, tz: string): string | null {
+export function computeInitialFire(rrule: string, dtstart: string, tz: string): string | null {
   try {
     const fires = nextFires({ rrule, dtstart, timezone: tz }, 1);
     return fires[0] ?? null;
@@ -76,7 +76,7 @@ function computeInitialFire(rrule: string, dtstart: string, tz: string): string 
   }
 }
 
-function presentReminder(r: Reminder) {
+export function presentReminder(r: Reminder) {
   return {
     id: r.id,
     title: r.title,
@@ -93,7 +93,7 @@ function presentReminder(r: Reminder) {
   };
 }
 
-function validationErrorResponse(e: unknown) {
+export function validationErrorResponse(e: unknown) {
   if (e instanceof RecurrenceValidationError) {
     return { error: e.code, message: e.message };
   }
@@ -116,7 +116,7 @@ export const remindersRoute = new Hono<AppBindings>()
 
   .get('/template-variables', (c) => c.json({ variables: TEMPLATE_VARIABLES }))
 
-  .post('/preview', zValidator('json', previewBody), async (c) => {
+  .post('/preview', zValidator('json', previewReminderBody), async (c) => {
     const input = c.req.valid('json');
     try {
       validateInputs({
@@ -164,7 +164,7 @@ export const remindersRoute = new Hono<AppBindings>()
     });
   })
 
-  .post('/', zValidator('json', createBody), async (c) => {
+  .post('/', zValidator('json', createReminderBody), async (c) => {
     const input = c.req.valid('json');
     const db = getDb(c.env);
     const userId = c.get('userId');
@@ -218,7 +218,7 @@ export const remindersRoute = new Hono<AppBindings>()
     return c.json({ reminder: presentReminder(row) });
   })
 
-  .patch('/:id{[0-9]+}', zValidator('json', patchBody), async (c) => {
+  .patch('/:id{[0-9]+}', zValidator('json', patchReminderBody), async (c) => {
     const id = Number(c.req.param('id'));
     const input = c.req.valid('json');
     const db = getDb(c.env);

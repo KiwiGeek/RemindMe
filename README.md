@@ -8,6 +8,14 @@ contributor conventions.
 
 ## Status
 
+**M4.5 — Admin console shipped.** Operators listed in `ADMIN_EMAILS` get
+an `Admin` button in the header that opens a separate console for
+managing other users' reminders. Admins can search users, create users
+who have never signed in (the standard OTP flow later claims the row),
+change a target's timezone, and full-CRUD any reminder. Every admin
+mutation lands in `audit_log`. The target user_id always comes from the
+URL, never the session — admins do not impersonate.
+
 **M4 — Email actions shipped.** Outgoing reminders carry signed one-click
 links for snooze (5 durations), skip-next, mark-done (with confirm step),
 per-series unsubscribe, and a magic-link "Manage all your reminders"
@@ -79,6 +87,24 @@ migration step is a no-op when there's nothing to apply.
 
 In dev, the Vite server proxies `/api/*` and `/r/*` to the Worker so the SPA
 talks to the same origin as in production.
+
+### Granting admin access
+
+The admin allow-list is the `ADMIN_EMAILS` var in `wrangler.toml` — a
+comma-separated, case-insensitive list of email addresses. There is no
+DB-stored admin flag on purpose: escalating to admin requires shipping a
+new Worker version, which in turn requires already controlling the
+deploy pipeline.
+
+To add or remove an admin:
+
+```toml
+[vars]
+ADMIN_EMAILS = "admin@example.com,ops@example.com"
+```
+
+Then `npm run deploy`. Affected accounts pick up the new role on their
+next `GET /api/me`.
 
 ### Manually firing a scheduler tick
 

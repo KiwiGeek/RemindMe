@@ -4,6 +4,7 @@ import { logger } from 'hono/logger';
 import type { AppBindings, Env } from '~/env';
 import { checkEnv } from '~/lib/envCheck';
 import { runScheduledTick } from '~/lib/scheduler';
+import { admin } from '~/routes/admin';
 import { auth } from '~/routes/auth';
 import { healthz } from '~/routes/healthz';
 import { me } from '~/routes/me';
@@ -22,6 +23,7 @@ app.route('/api/healthz', healthz);
 app.route('/api/auth', auth);
 app.route('/api/me', me);
 app.route('/api/reminders', remindersRoute);
+app.route('/api/admin', admin);
 app.route('/r', r);
 
 app.onError((err, c) => {

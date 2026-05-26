@@ -31,6 +31,9 @@ MAILGUN_REGION = "us"
 MAILGUN_DOMAIN = "example.com"
 MAILGUN_FROM = "Remind Me <reminders@example.com>"
 MAILGUN_REPLY_TO = "no-reply@example.com"
+# Comma-separated; case-insensitive. Anyone signed in with one of these
+# addresses sees `/admin` in the SPA and can hit `/api/admin/*`.
+ADMIN_EMAILS = "admin@example.com"
 
 # Secrets (set via `wrangler secret put <NAME>`):
 #   MAILGUN_API_KEY        - private Mailgun sending API key

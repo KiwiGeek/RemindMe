@@ -29,6 +29,7 @@ export default defineWorkersConfig(async () => {
               SESSION_SECRET: 'test-session-secret-aaaaaaaaaaaaaaaaaaaaaaaaaa',
               OTP_PEPPER: 'test-otp-pepper-bbbbbbbbbbbbbbbbbbbbbbbbbbbb',
               ACTION_TOKEN_SECRET: 'test-action-token-secret-cccccccccccccccccc',
+              ADMIN_EMAILS: 'admin@example.com,super@example.com',
             },
           },
         },
