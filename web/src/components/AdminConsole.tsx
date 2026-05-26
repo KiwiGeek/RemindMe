@@ -55,18 +55,7 @@ export function AdminConsole({ admin, onExit, onLoggedOut, onEnterSettings }: Pr
             <span class="font-normal text-zinc-600 dark:text-zinc-400">Remind Me</span>
           </h1>
           <p class="mt-1 text-xs text-zinc-500">
-            Signed in as{' '}
-            {onEnterSettings ? (
-              <button
-                type="button"
-                onClick={onEnterSettings}
-                class="rounded font-mono underline-offset-2 hover:underline"
-              >
-                {admin.email}
-              </button>
-            ) : (
-              <span class="font-mono">{admin.email}</span>
-            )}
+            Signed in as <span class="font-mono">{admin.email}</span>
           </p>
         </div>
         <div class="flex items-center gap-2 text-sm">
@@ -77,6 +66,15 @@ export function AdminConsole({ admin, onExit, onLoggedOut, onEnterSettings }: Pr
           >
             ← Back to my reminders
           </button>
+          {onEnterSettings && (
+            <button
+              type="button"
+              onClick={onEnterSettings}
+              class="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+            >
+              Settings
+            </button>
+          )}
           <button
             type="button"
             disabled={busy}
