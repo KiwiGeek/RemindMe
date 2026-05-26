@@ -95,7 +95,8 @@ plus internal routes for the webhook and email-action callbacks.
 | `GET`  | `/api/reminders/:id` | Read |
 | `PATCH`| `/api/reminders/:id` | Update / pause / resume |
 | `DELETE`| `/api/reminders/:id` | Soft delete |
-| `POST` | `/api/reminders/:id/preview` | Preview next N fire times (UI helper) |
+| `POST` | `/api/reminders/preview` | Preview next N fire times + sample rendered email |
+| `GET`  | `/api/reminders/template-variables` | Reference list for the form |
 | `GET`  | `/r/:token` | Email-action landing (snooze/skip/done/unsubscribe) |
 | `POST` | `/api/webhooks/mailgun` | Bounce / complaint / unsubscribe events |
 | `GET`  | `/*` | SPA shell + static assets |
@@ -189,9 +190,9 @@ CREATE TABLE reminders (
   user_id         INTEGER NOT NULL REFERENCES users(id),
   title           TEXT NOT NULL,
   body_md         TEXT NOT NULL DEFAULT '',
-  rrule           TEXT NOT NULL,
-  dtstart         TEXT NOT NULL,            -- ISO UTC
-  timezone        TEXT NOT NULL,            -- snapshot at create
+  rrule           TEXT NOT NULL,            -- no DTSTART/TZID embedded
+  dtstart         TEXT NOT NULL,            -- ISO 8601 wall-clock, no offset
+  timezone        TEXT NOT NULL,            -- IANA tz, snapshot at create
   next_fire_at    TEXT,                     -- ISO UTC, NULL when exhausted
   remaining_count INTEGER,                  -- NULL = indefinite
   status          TEXT NOT NULL DEFAULT 'active', -- active|paused|completed|suspended|deleted
@@ -335,8 +336,14 @@ WCAG AA contrast.
    cookie, `/api/me` GET+PATCH, first-sign-in timezone confirmation banner,
    bounce-recovery preflight (clears Mailgun suppressions before user-
    initiated sends), 35 tests.
-3. **M2 — Reminders CRUD.** API + UI to list/create/edit/delete + preview.
-   No actual sending yet.
+3. ~~**M2 — Reminders CRUD.**~~ ✅ D1 schema for `reminders`,
+   `reminder_fires`, `suppressions`, `audit_log`; recurrence engine
+   (`rrule` + `luxon` wrapper, wall-clock DST-safe storage); Markdown +
+   template-variable renderer (sanitised with `xss`); `/api/reminders`
+   CRUD with ownership scoping + `/preview` returning fires and a sample
+   rendered email; SPA dashboard with list, create/edit form, recurrence
+   picker (common patterns + custom RRULE), debounced live preview,
+   pause/resume/delete actions; 67 tests passing. No sending yet.
 4. **M3 — Scheduler.** Cron handler firing reminders; RRULE → next-fire
    calculation; `reminder_fires` log; idempotency.
 5. **M4 — Email actions.** Snooze / skip / mark done / manage page; action

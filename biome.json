@@ -61,6 +61,16 @@
           }
         }
       }
+    },
+    {
+      "include": ["web/src/components/ReminderForm.tsx"],
+      "linter": {
+        "rules": {
+          "security": {
+            "noDangerouslySetInnerHtml": "off"
+          }
+        }
+      }
     }
   ]
 }

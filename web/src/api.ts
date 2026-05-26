@@ -40,6 +40,61 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   return body;
 }
 
+export type ReminderStatus = 'active' | 'paused' | 'completed' | 'suspended' | 'deleted';
+
+export interface Reminder {
+  id: number;
+  title: string;
+  bodyMd: string;
+  rrule: string;
+  summary: string;
+  dtstart: string;
+  timezone: string;
+  nextFireAt: string | null;
+  remainingCount: number | null;
+  status: ReminderStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReminderEnds {
+  kind: 'never' | 'after_count';
+  afterCount?: number;
+}
+
+export interface ReminderInput {
+  title: string;
+  bodyMd: string;
+  rrule: string;
+  dtstart: string;
+  timezone?: string;
+  ends: ReminderEnds;
+}
+
+export interface PreviewInput {
+  title?: string;
+  bodyMd?: string;
+  rrule: string;
+  dtstart: string;
+  timezone: string;
+  count?: number;
+}
+
+export interface PreviewResult {
+  fires: string[];
+  summary: string;
+  sample: {
+    subject: string;
+    textBody: string;
+    htmlBody: string;
+  } | null;
+}
+
+export interface TemplateVariable {
+  name: string;
+  description: string;
+}
+
 export const api = {
   me: () => call<{ user: CurrentUser }>('/api/me'),
   requestCode: (email: string) =>
@@ -58,6 +113,27 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(patch),
     }),
+
+  listReminders: () => call<{ reminders: Reminder[] }>('/api/reminders'),
+  getReminder: (id: number) => call<{ reminder: Reminder }>(`/api/reminders/${id}`),
+  createReminder: (input: ReminderInput) =>
+    call<{ reminder: Reminder }>('/api/reminders', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  updateReminder: (id: number, patch: Partial<ReminderInput> & { status?: ReminderStatus }) =>
+    call<{ reminder: Reminder }>(`/api/reminders/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  deleteReminder: (id: number) => call<void>(`/api/reminders/${id}`, { method: 'DELETE' }),
+  previewReminder: (input: PreviewInput) =>
+    call<PreviewResult>('/api/reminders/preview', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  templateVariables: () =>
+    call<{ variables: TemplateVariable[] }>('/api/reminders/template-variables'),
 };
 
 export function detectBrowserTimezone(): string {

@@ -1,5 +1,7 @@
-import { useState } from 'preact/hooks';
-import { type CurrentUser, api } from '../api';
+import { useCallback, useEffect, useState } from 'preact/hooks';
+import { type CurrentUser, type Reminder, api } from '../api';
+import { ReminderForm } from './ReminderForm';
+import { RemindersList } from './RemindersList';
 import { TimezoneBanner } from './TimezoneBanner';
 
 interface Props {
@@ -8,8 +10,27 @@ interface Props {
   onLoggedOut: () => void;
 }
 
+type Mode = { kind: 'list' } | { kind: 'new' } | { kind: 'edit'; reminder: Reminder };
+
 export function Dashboard({ user, onUserChanged, onLoggedOut }: Props) {
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<Mode>({ kind: 'list' });
+  const [reminders, setReminders] = useState<Reminder[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await api.listReminders();
+      setReminders(res.reminders);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'failed to load');
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   async function logout() {
     setBusy(true);
@@ -22,7 +43,7 @@ export function Dashboard({ user, onUserChanged, onLoggedOut }: Props) {
   }
 
   return (
-    <main class="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-12">
+    <main class="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12">
       <header class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold tracking-tight">Remind Me</h1>
         <div class="flex items-center gap-3 text-sm">
@@ -40,11 +61,52 @@ export function Dashboard({ user, onUserChanged, onLoggedOut }: Props) {
 
       {!user.tzConfirmed && <TimezoneBanner user={user} onConfirmed={onUserChanged} />}
 
-      <section class="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-zinc-500 dark:border-zinc-700">
-        <p class="text-sm">
-          Your reminders will appear here once we ship the CRUD UI in the next milestone.
-        </p>
-      </section>
+      {mode.kind === 'list' && (
+        <>
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-medium">Your reminders</h2>
+            <button
+              type="button"
+              onClick={() => setMode({ kind: 'new' })}
+              class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+            >
+              + New reminder
+            </button>
+          </div>
+          {loadError && (
+            <p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+              {loadError}
+            </p>
+          )}
+          {reminders === null ? (
+            <p class="text-sm text-zinc-500">Loading…</p>
+          ) : (
+            <RemindersList
+              reminders={reminders}
+              userTimezone={user.timezone}
+              onEdit={(r) => setMode({ kind: 'edit', reminder: r })}
+              onChanged={() => void refresh()}
+            />
+          )}
+        </>
+      )}
+
+      {(mode.kind === 'new' || mode.kind === 'edit') && (
+        <section class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+          <h2 class="mb-4 text-lg font-medium">
+            {mode.kind === 'new' ? 'New reminder' : `Edit "${mode.reminder.title}"`}
+          </h2>
+          <ReminderForm
+            user={user}
+            existing={mode.kind === 'edit' ? mode.reminder : null}
+            onSaved={() => {
+              void refresh();
+              setMode({ kind: 'list' });
+            }}
+            onCancel={() => setMode({ kind: 'list' })}
+          />
+        </section>
+      )}
     </main>
   );
 }

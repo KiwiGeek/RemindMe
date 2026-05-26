@@ -6,6 +6,7 @@ import { checkEnv } from '~/lib/envCheck';
 import { auth } from '~/routes/auth';
 import { healthz } from '~/routes/healthz';
 import { me } from '~/routes/me';
+import { remindersRoute } from '~/routes/reminders';
 
 const app = new Hono<AppBindings>();
 
@@ -18,6 +19,7 @@ app.use('*', async (c, next) => {
 app.route('/api/healthz', healthz);
 app.route('/api/auth', auth);
 app.route('/api/me', me);
+app.route('/api/reminders', remindersRoute);
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
