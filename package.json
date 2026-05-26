@@ -37,7 +37,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@cloudflare/vitest-pool-workers": "^0.5.40",
+    "@cloudflare/vitest-pool-workers": "^0.16.10",
     "@cloudflare/workers-types": "^4.20241224.0",
     "@preact/preset-vite": "^2.9.1",
     "@tailwindcss/vite": "^4.0.0",
