@@ -1,15 +1,23 @@
-import { useMemo } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 
 /**
- * Fully controlled recurrence picker. The single source of truth is the
- * `value` prop (the RRULE string in the parent's form state). We derive the
- * UI shape from `value` via `useMemo` and emit changes through `onChange`
- * from each event handler — no internal state, no effects.
+ * Recurrence picker. The RRULE string in the parent's form state remains
+ * the source of truth for *which schedule will be saved*. We derive the
+ * structured pattern from `value` via `useMemo` and emit changes through
+ * `onChange` from each event handler — no `useEffect`-based prop→state
+ * mirroring (an earlier version did that and caused an infinite render
+ * loop, because the parent passes a fresh inline `onChange`, the effect
+ * re-fired every render, and each emit re-rendered the parent).
  *
- * Earlier versions kept a parallel `pattern` state synced via `useEffect`,
- * which caused an infinite render loop because the parent passes a fresh
- * inline `onChange`, the effect re-fires every render, and each emit
- * triggers another render in the parent.
+ * The one piece of UI-only state we keep is `stickyCustom`: once the user
+ * explicitly picks "Custom" from the dropdown, we stay in custom mode even
+ * if the typed RRULE happens to parse back into a structured kind (e.g.
+ * `FREQ=DAILY`, which the parser would otherwise snap to "Every day" and
+ * close the textbox out from under them). It's seeded from the initial
+ * parse so loading an existing custom reminder lands in custom mode
+ * without an extra click. The parent unmounts the form (and us) when it
+ * switches between "new" / "edit", so we don't need to worry about
+ * external value resets surviving the toggle.
  */
 
 const WEEK_DAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
@@ -66,9 +74,12 @@ interface Props {
 }
 
 export function RecurrencePicker({ value, onChange }: Props) {
-  const pattern = useMemo(() => parseRrule(value), [value]);
+  const parsed = useMemo(() => parseRrule(value), [value]);
+  const [stickyCustom, setStickyCustom] = useState(() => parsed.kind === 'custom');
+  const pattern: RecurrencePattern = stickyCustom ? { kind: 'custom', rrule: value } : parsed;
 
   function selectKind(kind: Kind) {
+    setStickyCustom(kind === 'custom');
     onChange(buildRrule(defaultPattern(kind)));
   }
 
