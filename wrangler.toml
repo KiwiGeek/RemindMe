@@ -33,7 +33,7 @@ MAILGUN_REPLY_TO = "no-reply@example.com"
 [[d1_databases]]
 binding = "DB"
 database_name = "remindme"
-database_id = "TODO_FILL_AFTER_D1_CREATE"
+database_id = "ea8256b9-bcd7-4d53-839d-cddcc6da1d94"
 migrations_dir = "migrations"
 
 # KV namespace for OTPs and rate-limit counters. Create with:
@@ -41,7 +41,7 @@ migrations_dir = "migrations"
 # and paste the returned id below.
 [[kv_namespaces]]
 binding = "KV"
-id = "TODO_FILL_AFTER_KV_CREATE"
+id = "0025dd3db7864577ab726877e31ee15a"
 
 # 1-minute scheduler tick.
 [triggers]
