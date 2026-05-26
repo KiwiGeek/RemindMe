@@ -69,8 +69,13 @@ npm test             # Vitest with Workers pool
 npm run lint         # Biome (use lint:fix to autofix)
 npm run typecheck    # tsc on Worker + SPA
 npm run build        # build SPA then dry-run Worker bundle
-npm run deploy       # build SPA + wrangler deploy
+npm run deploy       # build SPA + apply remote D1 migrations + wrangler deploy
 ```
+
+`npm run deploy` always applies any pending D1 migrations to the
+production database *before* uploading the new Worker code, so a deploy
+can never reference a table the production D1 doesn't have yet. The
+migration step is a no-op when there's nothing to apply.
 
 In dev, the Vite server proxies `/api/*` and `/r/*` to the Worker so the SPA
 talks to the same origin as in production.
