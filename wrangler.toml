@@ -1,0 +1,51 @@
+name = "remindme"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# Static SPA assets are served from this directory. The SPA build step
+# (`npm run build:web`) populates it before deploys.
+[assets]
+directory = "./web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Plaintext, non-secret runtime configuration.
+[vars]
+APP_NAME = "Remind Me"
+SITE_ORIGIN = "https://remindme.example.com"
+MAILGUN_REGION = "us"
+MAILGUN_DOMAIN = "example.com"
+MAILGUN_FROM = "Remind Me <reminders@example.com>"
+MAILGUN_REPLY_TO = "no-reply@example.com"
+
+# Secrets (set via `wrangler secret put <NAME>`):
+#   MAILGUN_API_KEY        - private Mailgun sending API key
+#   MAILGUN_SIGNING_KEY    - HTTP webhook signing key
+#   SESSION_SECRET         - HMAC key for session cookies
+#   OTP_PEPPER             - HMAC pepper for OTP code storage
+#   ACTION_TOKEN_SECRET    - HMAC key for email action URLs
+
+# D1 binding. The database is created with:
+#   npx wrangler d1 create remindme
+# then paste the returned id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "remindme"
+database_id = "TODO_FILL_AFTER_D1_CREATE"
+migrations_dir = "migrations"
+
+# KV namespace for OTPs and rate-limit counters. Create with:
+#   npx wrangler kv namespace create KV
+# and paste the returned id below.
+[[kv_namespaces]]
+binding = "KV"
+id = "TODO_FILL_AFTER_KV_CREATE"
+
+# 1-minute scheduler tick.
+[triggers]
+crons = ["* * * * *"]
+
+[observability.logs]
+enabled = true

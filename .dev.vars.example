@@ -1,0 +1,6 @@
+# Copy to `.dev.vars` for local `wrangler dev`. Never commit `.dev.vars`.
+MAILGUN_API_KEY=key-replace-me
+MAILGUN_SIGNING_KEY=replace-me
+SESSION_SECRET=generate-with-openssl-rand-hex-32
+OTP_PEPPER=generate-with-openssl-rand-hex-32
+ACTION_TOKEN_SECRET=generate-with-openssl-rand-hex-32

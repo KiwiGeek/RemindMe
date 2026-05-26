@@ -1,0 +1,53 @@
+{
+  "name": "remindme",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Passwordless recurring reminder email service on Cloudflare Workers + Mailgun.",
+  "scripts": {
+    "dev": "concurrently -n worker,web -c blue,green \"npm:dev:worker\" \"npm:dev:web\"",
+    "dev:worker": "wrangler dev",
+    "dev:web": "vite --config web/vite.config.ts",
+    "build": "npm run build:web && npm run build:worker",
+    "build:web": "vite build --config web/vite.config.ts",
+    "build:worker": "wrangler deploy --dry-run --outdir=dist",
+    "deploy": "npm run build:web && wrangler deploy",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply remindme --local",
+    "db:migrate:remote": "wrangler d1 migrations apply remindme --remote"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.36.4",
+    "hono": "^4.6.14",
+    "luxon": "^3.5.0",
+    "markdown-it": "^14.1.0",
+    "rrule": "^2.8.1",
+    "xss": "^1.0.15"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@cloudflare/vitest-pool-workers": "^0.5.40",
+    "@cloudflare/workers-types": "^4.20241224.0",
+    "@preact/preset-vite": "^2.9.1",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/luxon": "^3.4.2",
+    "@types/markdown-it": "^14.1.2",
+    "concurrently": "^9.1.0",
+    "drizzle-kit": "^0.30.1",
+    "preact": "^10.25.2",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.99.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

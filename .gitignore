@@ -1,0 +1,17 @@
+node_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+dist/
+web/dist/
+.vite/
+coverage/
+*.log
+.DS_Store
+.idea/
+.vscode/
+!.vscode/extensions.json
+.env
+.env.*
+!.env.example
