@@ -69,7 +69,7 @@ function initialState(user: Pick<CurrentUser, 'timezone'>, existing: Reminder | 
   }
   return {
     title: '',
-    bodyMd: '',
+    bodyMd: DEFAULT_BODY_TEMPLATE,
     rrule: 'FREQ=DAILY',
     dtstart: defaultDtstart(),
     timezone: user.timezone,
@@ -77,6 +77,14 @@ function initialState(user: Pick<CurrentUser, 'timezone'>, existing: Reminder | 
     endsAfterCount: '',
   };
 }
+
+// Pre-fills the body for a brand-new reminder. Demonstrates Markdown
+// (the bold around `{{title}}`) plus two of the most common template
+// variables so users see how the substitution works without having to
+// read the "Available template variables" disclosure first. Kept to a
+// single line so it's trivial to overwrite — the placeholder still
+// shows once the user clears the field.
+const DEFAULT_BODY_TEMPLATE = 'Hey, this is your reminder for **{{title}}** on {{date}}.\n';
 
 function defaultDtstart(): string {
   const d = new Date();
