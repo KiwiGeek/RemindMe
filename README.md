@@ -13,7 +13,7 @@ Preact + Tailwind v4 · Biome · Vitest (Workers pool) · Mailgun.
 
 ## Prerequisites
 
-- Node 20+
+- Node 22+ (required by Wrangler 4)
 - A Cloudflare account (free tier is fine). To use a custom domain you'll
   need that domain set up as an active zone on the same account.
 - A Mailgun account with your sending domain verified — SPF, DKIM, and
