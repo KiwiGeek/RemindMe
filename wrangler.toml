@@ -4,6 +4,18 @@ compatibility_date = "2025-01-15"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
+# Custom domain. Requires `example.com` to be an active zone on this
+# Cloudflare account (which it is). On `wrangler deploy`, Cloudflare:
+#   1. Creates a proxied DNS record for `remindme.example.com`.
+#   2. Issues a Universal SSL cert covering the hostname (first issuance
+#      can take 30s – a few minutes; until then browsers see a TLS error).
+#   3. Routes the hostname to this Worker.
+# Distinct from a `routes = […]` entry on an existing zone — `custom_domain`
+# handles the DNS + cert provisioning end-to-end.
+routes = [
+  { pattern = "remindme.example.com", custom_domain = true },
+]
+
 # Static SPA assets are served from this directory. The SPA build step
 # (`npm run build:web`) populates it before deploys.
 [assets]
