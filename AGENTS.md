@@ -16,9 +16,12 @@ Owner: `example.com`. GitHub repo: `RemindMe` (private).
 ## Architecture in one breath
 
 Single Cloudflare Worker that (a) serves the SPA + JSON API, (b) runs a
-1-minute cron to send due reminders, (c) receives Mailgun webhooks. D1 is the
-source of truth; KV holds OTP codes + rate-limit counters; secrets are Worker
-secrets. Recurrence is RFC 5545 RRULE.
+`*/5 * * * *` cron with a 6-minute look-ahead to send due reminders (and
+prune retention rows), (c) receives Mailgun webhooks at `/webhooks/mailgun`,
+(d) handles email-action links at `/r/:token`. D1 is the source of truth;
+a single `KV` binding holds OTP codes, rate-limit counters, Mailgun
+webhook-dedupe tokens, and WebAuthn challenges (all prefix-namespaced);
+secrets are Worker secrets. Recurrence is RFC 5545 RRULE.
 
 See `PLAN.md` §5 for the diagram and §6 for the schema.
 
@@ -29,10 +32,12 @@ See `PLAN.md` §5 for the diagram and §6 for the schema.
 - Hono router.
 - D1 + Drizzle ORM (migrations checked in under `migrations/`).
 - `rrule` for recurrence; `luxon` for timezones.
-- `markdown-it` + `sanitize-html` for reminder body rendering.
-- Preact + Vite + TailwindCSS for the SPA.
+- `markdown-it` + `xss` for reminder body rendering.
+- `@simplewebauthn/server` + `/browser` for optional passkey sign-in.
+- Preact + Vite + TailwindCSS (v4, class-based dark mode) for the SPA.
 - Biome for lint + format.
-- Vitest + `@cloudflare/vitest-pool-workers` for tests.
+- Vitest + `@cloudflare/vitest-pool-workers` for tests (Windows runs
+  pinned to `singleWorker: true` to avoid workerd loopback flakes).
 
 ## Repository layout (target)
 
@@ -57,7 +62,7 @@ See `PLAN.md` §5 for the diagram and §6 for the schema.
 │   ├── index.html
 │   ├── src/
 │   └── vite.config.ts
-└── .github/workflows/  CI (added at M2+)
+└── .github/workflows/  CI (lint + typecheck + test + build)
 ```
 
 The Worker serves `web/dist/` as static assets; the SPA calls the same origin
@@ -137,36 +142,37 @@ under `/api/*`.
 # install
 npm install
 
-# dev (Worker + SPA together)
+# dev (Worker + SPA together; auto-applies local D1 migrations)
 npm run dev
 
-# run cron locally (one-shot)
-npx wrangler dev --test-scheduled
-# then: curl 'http://localhost:8787/__scheduled?cron=*+*+*+*+*'
+# manually fire the scheduler against local dev
+curl 'http://localhost:8787/__scheduled?cron=*/5+*+*+*+*'
 
 # DB
 npx wrangler d1 migrations create remindme <name>
 npx wrangler d1 migrations apply remindme --local
 npx wrangler d1 migrations apply remindme --remote
 
-# secrets
+# secrets (5 — MAILGUN_DOMAIN, ADMIN_EMAILS, APP_NAME, SITE_ORIGIN
+# live in [vars] in wrangler.toml, not as secrets)
 npx wrangler secret put MAILGUN_API_KEY
 npx wrangler secret put MAILGUN_SIGNING_KEY
-npx wrangler secret put MAILGUN_DOMAIN
 npx wrangler secret put SESSION_SECRET
 npx wrangler secret put OTP_PEPPER
 npx wrangler secret put ACTION_TOKEN_SECRET
 
-# tests + lint
-npm test
-npx biome check .
-npx biome format --write .
+# checks
+npm run lint        # biome check
+npm run lint:fix    # biome check --write
+npm run typecheck   # tsc + tsc -p web
+npm test            # vitest run
+npm run build       # SPA build (web/dist)
 
-# deploy
-npx wrangler deploy
+# deploy (applies remote migrations, builds, then wrangler deploy)
+npm run deploy
 ```
 
 ## Where to put questions you can't answer yourself
 
-Add them to `PLAN.md` §14 ("Open Questions") rather than guessing. Flag
+Add them to `PLAN.md` §15 ("Open Questions") rather than guessing. Flag
 working assumptions inline with **[ASSUMPTION]** and the rationale.

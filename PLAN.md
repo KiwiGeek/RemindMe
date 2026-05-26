@@ -1,8 +1,9 @@
 # Remind Me — Plan
 
-> Living planning doc. Sections marked **[ASSUMPTION]** are working guesses
-> pending confirmation; sections marked **[OPEN QUESTION]** still need input.
-> Once a question is answered, fold the decision in and remove the marker.
+> Design + decisions log. The service is shipped; this file is the canonical
+> record of *why* it's shaped the way it is. Milestones in §13 are the
+> historical narrative — features themselves are documented in `README.md`
+> and the code.
 
 ## 1. Goal
 
@@ -29,10 +30,6 @@ Constraints:
 - **Reply-to:** `no-reply@example.com` (replies discarded; we'll add an
   auto-responder if you want one later).
 - **Mailgun API base:** `https://api.mailgun.net/v3/example.com`.
-
-> Alternate name ideas if you want to bikeshed before we commit copy:
-> *Nudge*, *Recur*, *Cadence*, *Loopback*, *Habituate*. Going with **Remind Me**
-> unless you swap it in the next round.
 
 ## 3. Cloudflare Free-Tier Building Blocks
 
@@ -61,9 +58,8 @@ expected volume; we can graduate to DO alarms later if fan-out grows.
 - **DB:** D1 + [Drizzle ORM](https://orm.drizzle.team) (migrations + types,
   with a raw-SQL escape hatch).
 - **Recurrence:** [`rrule`](https://www.npmjs.com/package/rrule) npm package.
-- **Markdown rendering (for emails):** `markdown-it` (small, sanitised output).
-- **HTML sanitisation:** `sanitize-html` (or a Worker-friendly equivalent —
-  may swap to `dompurify` + a tiny DOM shim if size requires).
+- **Markdown rendering (for emails):** `markdown-it`.
+- **HTML sanitisation:** `xss` (Worker-friendly, small bundle).
 - **Email transport:** Mailgun REST API via `fetch` (no SDK).
 - **Frontend:** Preact + Vite + TypeScript, TailwindCSS for styling.
 - **Lint/format:** Biome.
@@ -77,9 +73,9 @@ expected volume; we can graduate to DO alarms later if fan-out grows.
                           │
                           └────► Mailgun REST (OTP + reminders)
 
-[ Worker scheduled() every minute ] ──► [ D1 ] ──► Mailgun REST
+[ Worker scheduled() every 5 min ] ──► [ D1 ] ──► Mailgun REST
 
-[ Mailgun webhook → Worker /api/webhooks/mailgun ] ──► [ D1 ]
+[ Mailgun webhook → Worker /webhooks/mailgun ] ──► [ D1 ]
 ```
 
 One Worker, four entry points: `fetch` (API + static), `scheduled` (cron),
@@ -103,7 +99,24 @@ plus internal routes for the webhook and email-action callbacks.
 | `GET`  | `/api/reminders/template-variables` | Reference list for the form |
 | `GET`  | `/r/:token` | Email-action landing — confirm pages, magic-link sign-in |
 | `POST` | `/r/:token` | Apply confirmed action; RFC 8058 one-click List-Unsubscribe |
-| `POST` | `/api/webhooks/mailgun` | Bounce / complaint / unsubscribe events |
+| `POST` | `/webhooks/mailgun` | Bounce / complaint / unsubscribe events |
+| `GET`  | `/api/admin/users` | Admin: list/search users (gated by `ADMIN_EMAILS`) |
+| `POST` | `/api/admin/users` | Admin: create a user (claim flow on first OTP) |
+| `GET`  | `/api/admin/users/:id` | Admin: read one user |
+| `PATCH`| `/api/admin/users/:id` | Admin: update timezone, etc. |
+| `GET`  | `/api/admin/users/:id/reminders` | Admin: list a target's reminders |
+| `POST` | `/api/admin/users/:id/reminders` | Admin: create on behalf of target |
+| `GET`  | `/api/admin/users/:id/reminders/:rid` | Admin: read one |
+| `PATCH`| `/api/admin/users/:id/reminders/:rid` | Admin: update one |
+| `DELETE`| `/api/admin/users/:id/reminders/:rid` | Admin: soft-delete one |
+| `POST` | `/api/admin/users/:id/reminders/preview` | Admin: preview as target |
+| `POST` | `/api/passkeys/register/options` | WebAuthn registration challenge |
+| `POST` | `/api/passkeys/register/verify` | Verify registration response |
+| `POST` | `/api/passkeys/auth/options` | WebAuthn authentication challenge |
+| `POST` | `/api/passkeys/auth/verify` | Verify authentication → session cookie |
+| `GET`  | `/api/passkeys` | List the signed-in user's passkeys |
+| `PATCH`| `/api/passkeys/:id` | Rename a passkey |
+| `DELETE`| `/api/passkeys/:id` | Remove a passkey |
 | `GET`  | `/*` | SPA shell + static assets |
 
 ### 5.2 Recurrence
@@ -119,7 +132,7 @@ Stored as **RFC 5545 RRULE** strings. The UI exposes:
   - Every month on the Nth weekday (e.g. "first Monday")
   - Every year on a date
 - **Custom (advanced)**: free-text RRULE field with live "next 5 fires"
-  preview (powered by `/api/reminders/:id/preview`).
+  preview (powered by `POST /api/reminders/preview`).
 
 Each reminder stores `rrule`, `dtstart`, `timezone`, cached `next_fire_at`,
 optional `remaining_count`.
@@ -236,10 +249,15 @@ CREATE TABLE audit_log (
 );
 ```
 
-KV namespaces:
+KV usage (single binding, `env.KV`, prefix-namespaced):
 
-- `OTP` — keys `otp:<email_lower>` → JSON `{ code_hash, attempts }`, TTL 600s.
-- `RATELIMIT` — sliding-window counters per email + per IP.
+| Prefix | Purpose | TTL |
+| --- | --- | --- |
+| `otp:<email_lower>` | OTP code hash + attempt count | 10 min |
+| `rl:<bucket>:<key>` | Rate-limit counters (email / IP windows) | window length |
+| `mw:dedupe:<token>` | Mailgun webhook per-delivery dedupe | 24 h |
+| `pk:reg:<userId>` | Passkey registration challenge | 5 min |
+| `pk:auth:<challenge>` | Passkey authentication challenge | 5 min |
 
 ## 6.1 Passkeys
 
@@ -272,7 +290,7 @@ backwards causes the verify to fail, surfacing potential cloning.
    6-digit numeric, hashed (SHA-256 + per-Worker pepper) into KV, 10-min TTL.
 2. **Verify code.** `POST /api/auth/verify { email, code }`. Up to 5 attempts
    per code. On success: upsert `users`, issue signed session cookie:
-   - `sid` cookie, HttpOnly, Secure, SameSite=Lax, Max-Age = **30 days
+   - `rmd_sid` cookie, HttpOnly, Secure, SameSite=Lax, Max-Age = **30 days
      rolling**.
    - Value = HMAC-signed `{ user_id, iat, exp }`.
 3. **First-sign-in onboarding.** If `tz_confirmed = 0`, the dashboard pops a
@@ -326,20 +344,30 @@ Implemented in M5. Endpoint: `POST /webhooks/mailgun`.
   the next future occurrence so the user doesn't get a flood of backlog
   emails (same logic applies to long-paused reminders).
 
-## 9. Frontend UX (sketch)
+## 9. Frontend UX
 
-- `/` — logged-out: "Enter your email" → OTP input.
+- `/` — logged-out: "Enter your email" → OTP input, or "Sign in with a
+  passkey" if the browser supports WebAuthn.
 - `/` — logged-in dashboard:
   - Table of reminders: title, schedule summary, next fire, status pill.
-  - Actions per row: edit, pause/resume, delete.
-  - "New reminder" button → form (title, Markdown body, start datetime,
+  - Per-row actions: edit, pause/resume (or **Reactivate** when
+    `status='suspended'`), delete. Action buttons have
+    reminder-title-aware `aria-label`s for screen readers.
+  - "+ New reminder" button → form (title, Markdown body, start datetime,
     timezone (inherits user default), repeat pattern, ends).
   - Preview pane shows next 5 fire times + a rendered sample email.
-- `/manage?token=…` — public page reachable from email footer; lists that
-  email's reminders with checkboxes to bulk pause/disable/unsubscribe without
-  full sign-in (token is short-lived).
-- `/r/:token` — action landing (snooze applied / confirmation for "done" /
-  unsubscribe confirmation).
+  - Header buttons: **Settings**, **Admin** (admins only), **Sign out**,
+    theme toggle (System / Light / Dark).
+- `/r/:token` — email-action landing pages: snooze / skip-next / mark-done
+  confirmation / per-reminder unsubscribe / magic-link sign-in. POST
+  variant is the RFC 8058 one-click `List-Unsubscribe` target.
+- **Settings view** — houses Passkeys (add / list / rename / remove).
+  Separate top-level view rather than a modal so future settings
+  (notification prefs, account deletion, etc.) have room.
+- **Admin console** — only rendered when `/api/me` returns
+  `isAdmin: true`. Lists/searches users, creates users, edits timezones,
+  full CRUD over any user's reminders. "Acting as" banner makes it
+  visible whose reminders the admin is currently editing.
 
 Accessibility: keyboard-first, semantic HTML, prefers-reduced-motion respected,
 WCAG AA contrast.
@@ -371,16 +399,19 @@ WCAG AA contrast.
 
 ## 11. Local & Deploy Workflow
 
-- `wrangler dev` for local API + `wrangler dev --test-scheduled` for cron.
+- `wrangler dev --test-scheduled` for local API + cron (the flag exposes
+  `/__scheduled`, which our `npm run dev` already passes).
 - D1 migrations in `migrations/` applied with `wrangler d1 migrations apply`.
-- Secrets via `wrangler secret put`:
-  `MAILGUN_API_KEY`, `MAILGUN_SIGNING_KEY`, `MAILGUN_DOMAIN`,
-  `SESSION_SECRET`, `OTP_PEPPER`, `ACTION_TOKEN_SECRET`.
-- One `wrangler.toml`; environments `dev` (local), `staging` (later),
-  `production` (`remindme.example.com`).
-- GitHub Actions CI on push: `biome check`, `vitest run`, then
-  `wrangler deploy` on `main`. **[ASSUMPTION]** Add CI after M2 once there's
-  enough code to be worth gating.
+  `npm run dev` auto-applies them to the local D1 first.
+- Secrets via `wrangler secret put` (5):
+  `MAILGUN_API_KEY`, `MAILGUN_SIGNING_KEY`, `SESSION_SECRET`, `OTP_PEPPER`,
+  `ACTION_TOKEN_SECRET`. `MAILGUN_DOMAIN`, `ADMIN_EMAILS`, `APP_NAME`,
+  and `SITE_ORIGIN` live in `[vars]` in `wrangler.toml`.
+- One `wrangler.toml`; production binds the `remindme.example.com` custom
+  domain. No separate `staging` env yet — add one if/when needed.
+- GitHub Actions CI (`.github/workflows/ci.yml`) runs lint + typecheck +
+  tests + build on push to `main` and on every PR. Deploy stays manual
+  (`npm run deploy`) so a misconfigured workflow can't accidentally ship.
 
 ## 12. Out of Scope (v1)
 
@@ -435,6 +466,19 @@ WCAG AA contrast.
    their native Unsubscribe button. 19 new tests (token round-trips,
    prefix collision, tampering, expiry, every op, idempotency, magic
    link sign-in + suspended-user rejection); 94 total passing.
+6. ~~**M4.5 — Admin console.**~~ ✅ `ADMIN_EMAILS` env var (CSV, case-
+   insensitive) gates `/api/admin/*`. New `requireAdmin` middleware
+   resolves to 403 (not 404) so admins debugging production can tell the
+   route exists. Admin routes never look at the session for the target —
+   `:id` in the URL is the only source of truth, so a stale tab can't
+   cross-edit. Admins can list/search users (`?q=`), create users (with
+   `tz_confirmed=0` so the OTP claim flow re-prompts on first sign-in),
+   change a target's timezone, and full CRUD + preview reminders on
+   behalf of any user. Every mutation writes an `admin_*` row to
+   `audit_log` with `{admin_user_id, target_user_id, reminder_id?,
+   change?}`. SPA exposes the admin console behind a header button that
+   only renders when `/api/me` returns `isAdmin: true`. 18 new tests; 112
+   total passing.
 7. ~~**M4.6 — Optional passkey sign-in.**~~ ✅ Layered on top of email
    OTP (never replaces it — deleting your last passkey can't lock you
    out). `@simplewebauthn/server` v13 + `/browser` v13 power the
@@ -453,19 +497,6 @@ WCAG AA contrast.
    challenge KV plumbing, origin validation, list/patch/delete scoping,
    limit-reached, the unhappy-path verification branches); 130 total
    passing. Worker bundle now 415 KiB gzipped, SPA 41 KiB gzipped.
-6. ~~**M4.5 — Admin console.**~~ ✅ `ADMIN_EMAILS` env var (CSV, case-
-   insensitive) gates `/api/admin/*`. New `requireAdmin` middleware
-   resolves to 403 (not 404) so admins debugging production can tell the
-   route exists. Admin routes never look at the session for the target —
-   `:id` in the URL is the only source of truth, so a stale tab can't
-   cross-edit. Admins can list/search users (`?q=`), create users (with
-   `tz_confirmed=0` so the OTP claim flow re-prompts on first sign-in),
-   change a target's timezone, and full CRUD + preview reminders on
-   behalf of any user. Every mutation writes an `admin_*` row to
-   `audit_log` with `{admin_user_id, target_user_id, reminder_id?,
-   change?}`. SPA exposes the admin console behind a header button that
-   only renders when `/api/me` returns `isAdmin: true`. 18 new tests; 112
-   total passing.
 8. ~~**M5 — Bounce handling.**~~ ✅ `POST /webhooks/mailgun` verifies the
    Mailgun HMAC signature (rejecting >30-min-stale timestamps), dedupes
    the per-delivery `token` in KV for 24h, and routes events:
