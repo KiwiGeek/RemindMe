@@ -126,13 +126,23 @@ Stored as **RFC 5545 RRULE** strings. The UI exposes:
 - **Common patterns dropdown:**
   - Every day
   - Every weekday (Mon–Fri)
-  - Every week on selected days
-  - Every N weeks on selected days
-  - Every month on day N
-  - Every month on the Nth weekday (e.g. "first Monday")
-  - Every year on a date
-- **Custom (advanced)**: free-text RRULE field with live "next 5 fires"
-  preview (powered by `POST /api/reminders/preview`).
+  - Every N weeks on selected days (interval input + day toggles; covers
+    weekly and biweekly/triweekly variants)
+  - Every month on the start day (FREQ=MONTHLY with implicit BYMONTHDAY
+    from `dtstart`)
+  - Every month on the Nth weekday (ordinal × weekday, e.g. "First Monday"
+    or "Last Friday"; 5th-of-month deliberately omitted because months
+    without a 5th occurrence silently skip)
+  - Every year on the start date
+- **Custom (advanced)**: free-text RRULE field as an escape hatch for
+  shapes the dropdown can't represent (BYMONTHDAY lists, UNTIL/COUNT,
+  BYSETPOS, multi-occurrence BYDAY). The preview pane flags invalid
+  rules via `POST /api/reminders/preview`.
+
+The picker is order-insensitive when parsing an existing reminder's
+RRULE (so `INTERVAL=2;FREQ=WEEKLY;BYDAY=MO` round-trips cleanly) and
+falls back to "custom" whenever it sees a parameter it can't faithfully
+edit — never silently dropping user data.
 
 Each reminder stores `rrule`, `dtstart`, `timezone`, cached `next_fire_at`,
 optional `remaining_count`.
