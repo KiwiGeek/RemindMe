@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.8.0",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.0",
     "drizzle-orm": "^0.36.4",
     "hono": "^4.6.14",
     "luxon": "^3.5.0",

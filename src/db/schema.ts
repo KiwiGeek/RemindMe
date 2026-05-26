@@ -90,6 +90,33 @@ export const suppressions = sqliteTable('suppressions', {
   clearedAt: text('cleared_at'),
 });
 
+export const passkeys = sqliteTable(
+  'passkeys',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** base64url-encoded credentialId from the authenticator. */
+    credentialId: text('credential_id').notNull().unique(),
+    /** base64url-encoded COSE public key bytes (Uint8Array → base64url). */
+    publicKey: text('public_key').notNull(),
+    /** WebAuthn signature counter; we reject responses that don't advance it. */
+    counter: integer('counter').notNull().default(0),
+    /** JSON-encoded `AuthenticatorTransport[]`, e.g. `["internal","hybrid"]`. */
+    transports: text('transports'),
+    /** User-visible label so they can tell their keys apart in the management UI. */
+    nickname: text('nickname'),
+    createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+    lastUsedAt: text('last_used_at'),
+  },
+  (t) => ({
+    userIdx: index('idx_passkeys_user').on(t.userId),
+  }),
+);
+
+export type Passkey = typeof passkeys.$inferSelect;
+
 export const auditLog = sqliteTable(
   'audit_log',
   {

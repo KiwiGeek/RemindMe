@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { type CurrentUser, type Reminder, api } from '../api';
+import { PasskeysSection } from './PasskeysSection';
 import { ReminderForm } from './ReminderForm';
 import { RemindersList } from './RemindersList';
 import { TimezoneBanner } from './TimezoneBanner';
@@ -99,6 +100,7 @@ export function Dashboard({ user, onUserChanged, onLoggedOut, onEnterAdmin }: Pr
               onChanged={() => void refresh()}
             />
           )}
+          <PasskeysSection />
         </>
       )}
 

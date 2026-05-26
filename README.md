@@ -8,6 +8,16 @@ contributor conventions.
 
 ## Status
 
+**M4.6 — Optional passkey sign-in shipped.** Users can opt in to passkey
+auth from the dashboard's Passkeys section (Touch ID, Windows Hello,
+1Password, etc.). The sign-in screen offers a "Sign in with a passkey"
+button next to the email form. Passkeys are layered on top of email OTP
+— OTP still works for every account, so deleting your last passkey is
+never a lockout. Authentication uses discoverable credentials (no email
+entered; the browser picks the passkey). RP ID and expected origin are
+derived per-request from the `Origin` header, so `localhost` and
+`remindme.example.com` both work without env churn.
+
 **M4.5 — Admin console shipped.** Operators listed in `ADMIN_EMAILS` get
 an `Admin` button in the header that opens a separate console for
 managing other users' reminders. Admins can search users, create users
@@ -87,6 +97,25 @@ migration step is a no-op when there's nothing to apply.
 
 In dev, the Vite server proxies `/api/*` and `/r/*` to the Worker so the SPA
 talks to the same origin as in production.
+
+### Passkeys
+
+Passkeys are optional. To opt in:
+
+1. Sign in normally with email OTP.
+2. Scroll to the **Passkeys** section on the dashboard.
+3. Click **+ Add a passkey** and follow your browser's prompt.
+
+After that, the sign-in screen will offer a "Sign in with a passkey"
+button. Removing all passkeys is safe — email OTP keeps working.
+
+Implementation notes:
+- WebAuthn requires HTTPS *or* `localhost`. Plain `http://` on any other
+  hostname is rejected with a 400.
+- Authentication uses discoverable credentials, so no email is needed at
+  sign-in time; the browser/OS surfaces the passkeys it has for the
+  current origin and the server looks up the user from the credential.
+- We cap users at 10 passkeys to bound spam from misbehaving extensions.
 
 ### Granting admin access
 

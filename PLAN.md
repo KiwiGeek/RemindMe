@@ -241,6 +241,30 @@ KV namespaces:
 - `OTP` — keys `otp:<email_lower>` → JSON `{ code_hash, attempts }`, TTL 600s.
 - `RATELIMIT` — sliding-window counters per email + per IP.
 
+## 6.1 Passkeys
+
+Optional, additive. Email OTP remains the always-on baseline.
+
+| Concern | Decision |
+| --- | --- |
+| Library | `@simplewebauthn/server` v13 + `/browser` v13 |
+| RP ID | Derived per-request from `Origin` header (host of the page) |
+| Expected origin | The `Origin` header verbatim |
+| Multi-env | Same code serves `localhost` and `remindme.example.com` |
+| Discoverable creds | Yes — auth flow never asks for email; browser picks |
+| Challenge storage | KV, 5-minute TTL, key `pk:reg:{userId}` / `pk:auth:{challenge}` |
+| Per-user cap | 10 passkeys |
+| Rate limits | 60/hr/IP for auth options, 30/hr/IP for auth verify |
+| Lockout protection | None — email OTP works whether or not any passkey exists |
+
+`passkeys` schema: `(id, user_id, credential_id UNIQUE, public_key,
+counter, transports, nickname, created_at, last_used_at)`. We persist
+`credential_id` and `public_key` as base64url strings (since
+@simplewebauthn gives us back a base64url id and a `Uint8Array` public
+key respectively) and `transports` as a JSON-encoded array string. The
+WebAuthn signature counter is enforced strictly: any non-monotonic step
+backwards causes the verify to fail, surfacing potential cloning.
+
 ## 7. Auth Flow
 
 1. **Request code.** `POST /api/auth/request { email }`. Always responds
@@ -382,6 +406,24 @@ WCAG AA contrast.
    their native Unsubscribe button. 19 new tests (token round-trips,
    prefix collision, tampering, expiry, every op, idempotency, magic
    link sign-in + suspended-user rejection); 94 total passing.
+7. ~~**M4.6 — Optional passkey sign-in.**~~ ✅ Layered on top of email
+   OTP (never replaces it — deleting your last passkey can't lock you
+   out). `@simplewebauthn/server` v13 + `/browser` v13 power the
+   ceremonies. RP ID and expected origin are derived per-request from
+   the `Origin` header so `localhost` (dev) and `remindme.example.com`
+   (prod) work from the same code with no env toggling. Authentication
+   uses **discoverable credentials** — no email entered, the browser
+   picks a passkey, the server resolves the user via `credential_id` —
+   which is both the modern UX and avoids leaking email→credential
+   mappings. KV-stored challenges (`pk:reg:{userId}` for registration,
+   `pk:auth:{challenge}` for authentication) with a 5-minute TTL; per-IP
+   rate limits on the public verify endpoints. New `passkeys` table +
+   `0002_passkeys.sql` migration. SPA exposes a "Sign in with a passkey"
+   button next to the email form, plus a "Passkeys" section on the
+   dashboard for add/list/rename/remove. 18 new tests (auth gating,
+   challenge KV plumbing, origin validation, list/patch/delete scoping,
+   limit-reached, the unhappy-path verification branches); 130 total
+   passing. Worker bundle now 415 KiB gzipped, SPA 41 KiB gzipped.
 6. ~~**M4.5 — Admin console.**~~ ✅ `ADMIN_EMAILS` env var (CSV, case-
    insensitive) gates `/api/admin/*`. New `requireAdmin` middleware
    resolves to 403 (not 404) so admins debugging production can tell the
@@ -395,9 +437,9 @@ WCAG AA contrast.
    change?}`. SPA exposes the admin console behind a header button that
    only renders when `/api/me` returns `isAdmin: true`. 18 new tests; 112
    total passing.
-7. **M5 — Bounce handling.** Mailgun webhook receiver, suspension logic,
+8. **M5 — Bounce handling.** Mailgun webhook receiver, suspension logic,
    self-recovery flow.
-8. **M6 — Polish & launch.** Custom domain DNS, production secrets,
+9. **M6 — Polish & launch.** Custom domain DNS, production secrets,
    accessibility pass, README, deploy.
 
 ## 14. Resolved Decisions Log

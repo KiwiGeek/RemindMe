@@ -1,4 +1,5 @@
-import { useState } from 'preact/hooks';
+import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
+import { useEffect, useState } from 'preact/hooks';
 import { ApiError, type CurrentUser, api } from '../api';
 
 type Stage = 'email' | 'code';
@@ -12,7 +13,37 @@ export function SignIn({ onSignedIn }: Props) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+
+  useEffect(() => {
+    setPasskeySupported(browserSupportsWebAuthn());
+  }, []);
+
+  async function signInWithPasskey() {
+    setError(null);
+    setPasskeyBusy(true);
+    try {
+      const { options } = await api.passkeyAuthOptions();
+      const response = await startAuthentication({
+        optionsJSON: options as unknown as Parameters<typeof startAuthentication>[0]['optionsJSON'],
+      });
+      const { user } = await api.passkeyAuthVerify(response);
+      onSignedIn(user);
+    } catch (err) {
+      // User cancellation is benign — silently bail without showing an error.
+      if (
+        err instanceof DOMException &&
+        (err.name === 'NotAllowedError' || err.name === 'AbortError')
+      ) {
+        return;
+      }
+      setError(humaniseError(err, "Couldn't sign in with a passkey. Try the email code instead."));
+    } finally {
+      setPasskeyBusy(false);
+    }
+  }
 
   async function submitEmail(e: Event) {
     e.preventDefault();
@@ -52,28 +83,47 @@ export function SignIn({ onSignedIn }: Props) {
       </header>
 
       {stage === 'email' && (
-        <form onSubmit={submitEmail} class="space-y-3">
-          <label class="block text-sm font-medium" for="email-input">
-            Email
-          </label>
-          <input
-            id="email-input"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onInput={(e) => setEmail((e.currentTarget as HTMLInputElement).value)}
-            class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:border-zinc-400 dark:focus:ring-zinc-700"
-            placeholder="you@example.com"
-          />
-          <button
-            type="submit"
-            disabled={busy || !email}
-            class="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
-          >
-            {busy ? 'Sending…' : 'Send me a code'}
-          </button>
-        </form>
+        <div class="space-y-4">
+          {passkeySupported && (
+            <>
+              <button
+                type="button"
+                onClick={() => void signInWithPasskey()}
+                disabled={passkeyBusy}
+                class="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium shadow-sm transition hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+              >
+                {passkeyBusy ? 'Waiting for your passkey…' : 'Sign in with a passkey'}
+              </button>
+              <div class="flex items-center gap-3 text-xs text-zinc-500">
+                <span class="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                or
+                <span class="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+              </div>
+            </>
+          )}
+          <form onSubmit={submitEmail} class="space-y-3">
+            <label class="block text-sm font-medium" for="email-input">
+              Email
+            </label>
+            <input
+              id="email-input"
+              type="email"
+              required
+              autoComplete="email webauthn"
+              value={email}
+              onInput={(e) => setEmail((e.currentTarget as HTMLInputElement).value)}
+              class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:border-zinc-400 dark:focus:ring-zinc-700"
+              placeholder="you@example.com"
+            />
+            <button
+              type="submit"
+              disabled={busy || !email}
+              class="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+            >
+              {busy ? 'Sending…' : 'Send me a code'}
+            </button>
+          </form>
+        </div>
       )}
 
       {stage === 'code' && (

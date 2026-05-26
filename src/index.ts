@@ -8,6 +8,7 @@ import { admin } from '~/routes/admin';
 import { auth } from '~/routes/auth';
 import { healthz } from '~/routes/healthz';
 import { me } from '~/routes/me';
+import { passkeysRoute } from '~/routes/passkeys';
 import { r } from '~/routes/r';
 import { remindersRoute } from '~/routes/reminders';
 
@@ -23,6 +24,7 @@ app.route('/api/healthz', healthz);
 app.route('/api/auth', auth);
 app.route('/api/me', me);
 app.route('/api/reminders', remindersRoute);
+app.route('/api/passkeys', passkeysRoute);
 app.route('/api/admin', admin);
 app.route('/r', r);
 

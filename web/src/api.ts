@@ -99,6 +99,21 @@ export interface TemplateVariable {
   description: string;
 }
 
+export interface Passkey {
+  id: number;
+  nickname: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  transports?: string[];
+}
+
+/**
+ * Server returns the raw output of @simplewebauthn/server's
+ * `generateRegistrationOptions` / `generateAuthenticationOptions` — JSON
+ * shaped to match what `@simplewebauthn/browser` expects as input.
+ */
+export type WebAuthnOptions = Record<string, unknown>;
+
 export const api = {
   me: () => call<{ user: CurrentUser }>('/api/me'),
   requestCode: (email: string) =>
@@ -138,6 +153,35 @@ export const api = {
     }),
   templateVariables: () =>
     call<{ variables: TemplateVariable[] }>('/api/reminders/template-variables'),
+
+  // ---- passkeys -----------------------------------------------------------
+  listPasskeys: () => call<{ passkeys: Passkey[] }>('/api/passkeys'),
+  passkeyRegisterOptions: (nickname?: string) =>
+    call<{ options: WebAuthnOptions }>('/api/passkeys/register/options', {
+      method: 'POST',
+      body: JSON.stringify({ nickname }),
+    }),
+  passkeyRegisterVerify: (response: unknown, nickname?: string) =>
+    call<{ passkey: Passkey }>('/api/passkeys/register/verify', {
+      method: 'POST',
+      body: JSON.stringify({ response, nickname }),
+    }),
+  passkeyAuthOptions: () =>
+    call<{ options: WebAuthnOptions }>('/api/passkeys/auth/options', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  passkeyAuthVerify: (response: unknown) =>
+    call<{ user: CurrentUser }>('/api/passkeys/auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ response }),
+    }),
+  passkeyRename: (id: number, nickname: string) =>
+    call<{ passkey: Passkey }>(`/api/passkeys/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ nickname }),
+    }),
+  passkeyDelete: (id: number) => call<void>(`/api/passkeys/${id}`, { method: 'DELETE' }),
 
   // ---- admin --------------------------------------------------------------
   adminListUsers: (q?: string) =>
