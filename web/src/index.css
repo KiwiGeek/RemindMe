@@ -1,1 +1,9 @@
 @import "tailwindcss";
+
+/* Class-based dark mode: Tailwind v4 defaults to a `prefers-color-scheme`
+ * media query, which we can't override. Switching the `dark:` variant to
+ * match `.dark` (or any descendant of it) lets us drive the theme from
+ * `<html class="dark">` regardless of what the OS reports. The pre-mount
+ * script in `index.html` applies the right class before React paints so
+ * there's no flash of the wrong theme. */
+@custom-variant dark (&:where(.dark, .dark *));

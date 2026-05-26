@@ -8,6 +8,7 @@
 import { useState } from 'preact/hooks';
 import { type CurrentUser, api } from '../api';
 import { PasskeysSection } from './PasskeysSection';
+import { ThemeToggle } from './ThemeToggle';
 
 interface Props {
   user: CurrentUser;
@@ -41,6 +42,7 @@ export function Settings({ user, onExit, onLoggedOut }: Props) {
           </p>
         </div>
         <div class="flex items-center gap-2 text-sm">
+          <ThemeToggle />
           <button
             type="button"
             onClick={onExit}

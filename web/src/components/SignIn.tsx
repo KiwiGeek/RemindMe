@@ -1,6 +1,7 @@
 import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, type CurrentUser, api } from '../api';
+import { ThemeToggle } from './ThemeToggle';
 
 type Stage = 'email' | 'code';
 
@@ -75,11 +76,14 @@ export function SignIn({ onSignedIn }: Props) {
 
   return (
     <section class="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-6 py-12">
-      <header class="space-y-2">
-        <h1 class="text-3xl font-semibold tracking-tight">Remind Me</h1>
-        <p class="text-zinc-600 dark:text-zinc-400">
-          Sign in with your email. We&apos;ll send you a one-time code — no password needed.
-        </p>
+      <header class="flex items-start justify-between gap-3">
+        <div class="space-y-2">
+          <h1 class="text-3xl font-semibold tracking-tight">Remind Me</h1>
+          <p class="text-zinc-600 dark:text-zinc-400">
+            Sign in with your email. We&apos;ll send you a one-time code — no password needed.
+          </p>
+        </div>
+        <ThemeToggle />
       </header>
 
       {stage === 'email' && (

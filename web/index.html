@@ -6,6 +6,25 @@
     <meta name="color-scheme" content="light dark" />
     <title>Remind Me</title>
     <link rel="icon" href="data:," />
+    <script>
+      // Apply the user's theme preference before paint so the page never
+      // flashes the wrong scheme. Mirrors the logic in useTheme.ts —
+      // keep them in sync. Default ("system") follows prefers-color-scheme.
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          var pref = saved === 'light' || saved === 'dark' ? saved : 'system';
+          var dark =
+            pref === 'dark' ||
+            (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {
+          // localStorage blocked (private browsing, etc.) — fall through to
+          // the prefers-color-scheme default.
+        }
+      })();
+    </script>
   </head>
   <body class="min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
     <div id="app"></div>

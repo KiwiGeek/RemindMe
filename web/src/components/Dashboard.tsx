@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 import { type CurrentUser, type Reminder, api } from '../api';
 import { ReminderForm } from './ReminderForm';
 import { RemindersList } from './RemindersList';
+import { ThemeToggle } from './ThemeToggle';
 import { TimezoneBanner } from './TimezoneBanner';
 
 interface Props {
@@ -57,6 +58,7 @@ export function Dashboard({
         <h1 class="text-2xl font-semibold tracking-tight">Remind Me</h1>
         <div class="flex items-center gap-3 text-sm">
           <span class="hidden text-zinc-600 sm:inline dark:text-zinc-400">{user.email}</span>
+          <ThemeToggle />
           <button
             type="button"
             onClick={onEnterSettings}

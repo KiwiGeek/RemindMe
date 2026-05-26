@@ -17,6 +17,7 @@ import {
 } from '../api';
 import { ReminderForm, adminClient } from './ReminderForm';
 import { RemindersList, adminListClient } from './RemindersList';
+import { ThemeToggle } from './ThemeToggle';
 
 interface Props {
   admin: CurrentUser;
@@ -59,6 +60,7 @@ export function AdminConsole({ admin, onExit, onLoggedOut, onEnterSettings }: Pr
           </p>
         </div>
         <div class="flex items-center gap-2 text-sm">
+          <ThemeToggle />
           <button
             type="button"
             onClick={onExit}
