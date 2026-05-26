@@ -1,7 +1,7 @@
 import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, type CurrentUser, api } from '../api';
-import { SHORT_SHA, formatBuildTimestamp } from '../buildInfo';
+import { SHORT_SHA, commitUrl, formatBuildTimestamp } from '../buildInfo';
 import { ThemeToggle } from './ThemeToggle';
 
 type Stage = 'email' | 'code';
@@ -192,11 +192,36 @@ export function SignIn({ onSignedIn }: Props) {
 
       <footer class="pt-12 text-center text-[11px] leading-relaxed text-zinc-400 dark:text-zinc-600">
         <p>
-          Build <code class="font-mono">{SHORT_SHA}</code> · {formatBuildTimestamp()}
+          Build <BuildSha /> · {formatBuildTimestamp()}
         </p>
         <p class="mt-1">No warranties implied. Use at your own risk.</p>
       </footer>
     </section>
+  );
+}
+
+/**
+ * The short build SHA. Linked to its GitHub commit page when the build
+ * came from a real commit; rendered as plain text for local "dev"
+ * builds where no public URL exists. The link will 404 until the repo
+ * is made public, but it's wired up so we don't have to remember
+ * later — externalising is just a `gh repo edit --visibility public`
+ * away.
+ */
+function BuildSha() {
+  const url = commitUrl();
+  if (!url) {
+    return <code class="font-mono">{SHORT_SHA}</code>;
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="font-mono underline-offset-2 hover:underline focus:underline focus:outline-none"
+    >
+      {SHORT_SHA}
+    </a>
   );
 }
 
