@@ -22,6 +22,7 @@ interface Props {
   admin: CurrentUser;
   onExit: () => void;
   onLoggedOut: () => void;
+  onEnterSettings?: () => void;
 }
 
 type View =
@@ -31,7 +32,7 @@ type View =
 
 type UserMode = { kind: 'list' } | { kind: 'new' } | { kind: 'edit'; reminder: Reminder };
 
-export function AdminConsole({ admin, onExit, onLoggedOut }: Props) {
+export function AdminConsole({ admin, onExit, onLoggedOut, onEnterSettings }: Props) {
   const [view, setView] = useState<View>({ kind: 'users' });
   const [busy, setBusy] = useState(false);
 
@@ -54,7 +55,18 @@ export function AdminConsole({ admin, onExit, onLoggedOut }: Props) {
             <span class="font-normal text-zinc-600 dark:text-zinc-400">Remind Me</span>
           </h1>
           <p class="mt-1 text-xs text-zinc-500">
-            Signed in as <span class="font-mono">{admin.email}</span>
+            Signed in as{' '}
+            {onEnterSettings ? (
+              <button
+                type="button"
+                onClick={onEnterSettings}
+                class="rounded font-mono underline-offset-2 hover:underline"
+              >
+                {admin.email}
+              </button>
+            ) : (
+              <span class="font-mono">{admin.email}</span>
+            )}
           </p>
         </div>
         <div class="flex items-center gap-2 text-sm">

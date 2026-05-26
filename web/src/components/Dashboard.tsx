@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { type CurrentUser, type Reminder, api } from '../api';
-import { PasskeysSection } from './PasskeysSection';
 import { ReminderForm } from './ReminderForm';
 import { RemindersList } from './RemindersList';
 import { TimezoneBanner } from './TimezoneBanner';
@@ -11,11 +10,18 @@ interface Props {
   onLoggedOut: () => void;
   /** Provided only when the signed-in user is an admin. */
   onEnterAdmin?: () => void;
+  onEnterSettings: () => void;
 }
 
 type Mode = { kind: 'list' } | { kind: 'new' } | { kind: 'edit'; reminder: Reminder };
 
-export function Dashboard({ user, onUserChanged, onLoggedOut, onEnterAdmin }: Props) {
+export function Dashboard({
+  user,
+  onUserChanged,
+  onLoggedOut,
+  onEnterAdmin,
+  onEnterSettings,
+}: Props) {
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [reminders, setReminders] = useState<Reminder[] | null>(null);
@@ -50,7 +56,14 @@ export function Dashboard({ user, onUserChanged, onLoggedOut, onEnterAdmin }: Pr
       <header class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold tracking-tight">Remind Me</h1>
         <div class="flex items-center gap-3 text-sm">
-          <span class="text-zinc-600 dark:text-zinc-400">{user.email}</span>
+          <button
+            type="button"
+            onClick={onEnterSettings}
+            title="Account settings"
+            class="rounded-md px-2 py-1 text-zinc-600 underline-offset-2 hover:bg-zinc-100 hover:underline dark:text-zinc-400 dark:hover:bg-zinc-900"
+          >
+            {user.email}
+          </button>
           {onEnterAdmin && (
             <button
               type="button"
@@ -100,7 +113,6 @@ export function Dashboard({ user, onUserChanged, onLoggedOut, onEnterAdmin }: Pr
               onChanged={() => void refresh()}
             />
           )}
-          <PasskeysSection />
         </>
       )}
 

@@ -2,9 +2,10 @@ import { useEffect, useState } from 'preact/hooks';
 import { ApiError, type CurrentUser, api } from './api';
 import { AdminConsole } from './components/AdminConsole';
 import { Dashboard } from './components/Dashboard';
+import { Settings } from './components/Settings';
 import { SignIn } from './components/SignIn';
 
-type View = 'dashboard' | 'admin';
+type View = 'dashboard' | 'admin' | 'settings';
 
 type State =
   | { kind: 'loading' }
@@ -54,6 +55,17 @@ export function App() {
         admin={state.user}
         onExit={() => setState({ ...state, view: 'dashboard' })}
         onLoggedOut={() => setState({ kind: 'signed_out' })}
+        onEnterSettings={() => setState({ ...state, view: 'settings' })}
+      />
+    );
+  }
+
+  if (state.view === 'settings') {
+    return (
+      <Settings
+        user={state.user}
+        onExit={() => setState({ ...state, view: 'dashboard' })}
+        onLoggedOut={() => setState({ kind: 'signed_out' })}
       />
     );
   }
@@ -64,6 +76,7 @@ export function App() {
     onUserChanged: (user: CurrentUser) =>
       setState({ kind: 'signed_in', user, view: signedInState.view }),
     onLoggedOut: () => setState({ kind: 'signed_out' }),
+    onEnterSettings: () => setState({ ...signedInState, view: 'settings' as const }),
     ...(signedInState.user.isAdmin
       ? { onEnterAdmin: () => setState({ ...signedInState, view: 'admin' as const }) }
       : {}),
