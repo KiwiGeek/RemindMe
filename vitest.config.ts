@@ -1,5 +1,26 @@
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineWorkersConfig, readD1Migrations } from '@cloudflare/vitest-pool-workers/config';
+
+// Wrangler validates `wrangler.toml`'s `[assets] directory` at config-load
+// time and refuses to start the test pool if it's missing. The SPA build
+// output (`web/dist/`) is git-ignored, so on a fresh checkout — CI or a
+// teammate after `git clean -fdx` — the directory simply doesn't exist
+// and tests fail before they even start with a confusing
+// "directory specified by assets.directory does not exist" error.
+//
+// We don't actually need the real SPA bundle to run worker tests (none
+// of them hit static assets), so populate a no-op placeholder if it's
+// not already there. `npm run build:web` will overwrite it the moment
+// anyone runs a real build.
+const ASSETS_DIR = fileURLToPath(new URL('./web/dist', import.meta.url));
+if (!existsSync(ASSETS_DIR)) {
+  mkdirSync(ASSETS_DIR, { recursive: true });
+  writeFileSync(
+    `${ASSETS_DIR}/index.html`,
+    '<!doctype html><meta charset="utf-8"><title>test-stub</title>',
+  );
+}
 
 export default defineWorkersConfig(async () => {
   const migrations = await readD1Migrations('./migrations');

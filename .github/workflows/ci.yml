@@ -37,11 +37,16 @@ jobs:
       - name: Typecheck (worker + web)
         run: npm run typecheck
 
-      - name: Unit + integration tests (vitest, workers pool)
-        run: npm test -- --run
-
+      # Build before tests: `wrangler.toml` declares `[assets] directory
+      # = ./web/dist`, and the workers test pool refuses to start if that
+      # directory doesn't exist. vitest.config.ts also writes a stub if
+      # the folder is missing, but running the real build here also
+      # smoke-tests the SPA build path before we sink time into tests.
       - name: Build (SPA + worker dry-run)
         run: npm run build
+
+      - name: Unit + integration tests (vitest, workers pool)
+        run: npm test -- --run
 
   deploy:
     name: deploy to Cloudflare Workers
