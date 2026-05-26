@@ -1,0 +1,34 @@
+import { createMiddleware } from 'hono/factory';
+import { HTTPException } from 'hono/http-exception';
+import type { AppBindings } from '~/env';
+import { readSessionCookie, signSession, verifySession, writeSessionCookie } from '~/lib/session';
+
+declare module 'hono' {
+  interface ContextVariableMap {
+    userId: number;
+  }
+}
+
+/**
+ * Require a valid session cookie. On success, attaches `userId` to the
+ * context and re-issues the cookie with a fresh expiry (rolling session).
+ */
+export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
+  const token = readSessionCookie(c);
+  if (!token) throw new HTTPException(401, { message: 'unauthorized' });
+
+  const payload = await verifySession(c.env.SESSION_SECRET, token);
+  if (!payload) throw new HTTPException(401, { message: 'unauthorized' });
+
+  c.set('userId', payload.uid);
+
+  // Refresh cookie if more than 1 day has elapsed since issuance — keeps
+  // `Set-Cookie` traffic low while still rolling the expiry.
+  const ageDays = (Math.floor(Date.now() / 1000) - payload.iat) / 86400;
+  if (ageDays > 1) {
+    const fresh = await signSession(c.env.SESSION_SECRET, payload.uid);
+    writeSessionCookie(c, fresh);
+  }
+
+  await next();
+});

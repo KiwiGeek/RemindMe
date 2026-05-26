@@ -23,12 +23,14 @@
     "db:migrate:remote": "wrangler d1 migrations apply remindme --remote"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.8.0",
     "drizzle-orm": "^0.36.4",
     "hono": "^4.6.14",
     "luxon": "^3.5.0",
     "markdown-it": "^14.1.0",
     "rrule": "^2.8.1",
-    "xss": "^1.0.15"
+    "xss": "^1.0.15",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

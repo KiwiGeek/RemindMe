@@ -326,11 +326,15 @@ WCAG AA contrast.
 
 ## 13. Milestones
 
-1. **M0 — Scaffold.** Wrangler project, Hono router, D1 binding, Drizzle
-   migrations, `wrangler.toml`, Vite + Preact frontend skeleton, Biome,
-   Vitest, `/api/healthz` route.
-2. **M1 — Auth.** Email + OTP flow end-to-end against Mailgun sandbox; first-
-   sign-in timezone confirmation.
+1. ~~**M0 — Scaffold.**~~ ✅ Wrangler project, Hono router, D1 binding,
+   Drizzle migrations, `wrangler.toml`, Vite + Preact frontend skeleton,
+   Biome, Vitest, `/api/healthz` route. Smoke-deployed to
+   `remindme.workers.dev`.
+2. ~~**M1 — Auth.**~~ ✅ Email + OTP via Mailgun, KV-stored hashed codes
+   with attempt + per-email/IP rate limits, HMAC-signed rolling session
+   cookie, `/api/me` GET+PATCH, first-sign-in timezone confirmation banner,
+   bounce-recovery preflight (clears Mailgun suppressions before user-
+   initiated sends), 35 tests.
 3. **M2 — Reminders CRUD.** API + UI to list/create/edit/delete + preview.
    No actual sending yet.
 4. **M3 — Scheduler.** Cron handler firing reminders; RRULE → next-fire
