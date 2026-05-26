@@ -10,6 +10,7 @@ import { renderOtpEmail } from '~/lib/emails/otp';
 import { MailgunClient } from '~/lib/mailgun';
 import { rateLimit } from '~/lib/ratelimit';
 import { clearSessionCookie, signSession, writeSessionCookie } from '~/lib/session';
+import { clearSuppressionForEmail } from '~/lib/suppression';
 import { presentUser } from '~/routes/me';
 
 const OTP_TTL_SECONDS = 10 * 60;
@@ -150,10 +151,11 @@ export const auth = new Hono<AppBindings>()
       const inserted = await db.insert(users).values({ email }).returning();
       user = inserted[0];
     } else if (user.status === 'suspended') {
-      // Bounce-recovery path: user came back, we cleared Mailgun suppression
-      // when sending the OTP, the send obviously worked. Reactivate the
-      // account but leave their reminders in `suspended` until they opt in
-      // per-reminder from the dashboard (handled in M5).
+      // Bounce-recovery path: user just proved they own the inbox. Reactivate
+      // the account and clear our local suppression row so the scheduler
+      // stops skipping their sends. Per-reminder reactivation stays opt-in —
+      // each suspended reminder needs an explicit "Reactivate" click in the
+      // dashboard so a once-bouncing address can't auto-resume a flood.
       await db.update(users).set({ status: 'active' }).where(eq(users.id, user.id));
       user = { ...user, status: 'active' };
     }
@@ -161,6 +163,11 @@ export const auth = new Hono<AppBindings>()
     if (!user) {
       return c.json({ error: 'internal' }, 500);
     }
+
+    // Always clear local suppression on successful verify — the OTP send
+    // itself only works if Mailgun accepts the address, so by this point we
+    // *know* the inbox is reachable.
+    await clearSuppressionForEmail(c.env, email);
 
     const token = await signSession(c.env.SESSION_SECRET, user.id);
     writeSessionCookie(c, token);

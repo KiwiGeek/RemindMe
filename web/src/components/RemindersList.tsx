@@ -47,6 +47,18 @@ export function RemindersList({
     }
   }
 
+  async function reactivate(r: Reminder) {
+    setBusyId(r.id);
+    try {
+      // PATCH to 'active' triggers the server to skip past any missed
+      // occurrences so the user doesn't get a flood of backdated emails.
+      await client.setStatus(r.id, 'active');
+      onChanged();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function remove(r: Reminder) {
     if (!confirm(`Delete "${r.title}"? This cannot be undone.`)) return;
     setBusyId(r.id);
@@ -92,16 +104,25 @@ export function RemindersList({
               </td>
               <td class="px-3 py-3 text-right">
                 <div class="inline-flex gap-1">
-                  <button
-                    type="button"
-                    disabled={
-                      busyId === r.id || r.status === 'completed' || r.status === 'suspended'
-                    }
-                    onClick={() => void togglePause(r)}
-                    class="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                  >
-                    {r.status === 'paused' ? 'Resume' : 'Pause'}
-                  </button>
+                  {r.status === 'suspended' ? (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => void reactivate(r)}
+                      class="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 dark:hover:bg-emerald-900"
+                    >
+                      Reactivate
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id || r.status === 'completed'}
+                      onClick={() => void togglePause(r)}
+                      class="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                    >
+                      {r.status === 'paused' ? 'Resume' : 'Pause'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => onEdit(r)}

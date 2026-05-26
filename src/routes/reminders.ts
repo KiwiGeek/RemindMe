@@ -76,6 +76,26 @@ export function computeInitialFire(rrule: string, dtstart: string, tz: string): 
   }
 }
 
+/**
+ * Find the next occurrence strictly after `afterUtc`. Used when a user
+ * resumes a paused/suspended reminder long after it should have fired — we
+ * don't want the scheduler to instantly send a backlog of missed emails, so
+ * the next fire is the next future occurrence per the recurrence rule.
+ */
+export function computeNextFireAfter(
+  rrule: string,
+  dtstart: string,
+  tz: string,
+  afterUtc: string,
+): string | null {
+  try {
+    const fires = nextFires({ rrule, dtstart, timezone: tz }, 1, { afterUtc });
+    return fires[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function presentReminder(r: Reminder) {
   return {
     id: r.id,
@@ -264,6 +284,15 @@ export const remindersRoute = new Hono<AppBindings>()
     if (input.status !== undefined) patch.status = input.status;
     if (scheduleChanged) {
       patch.nextFireAt = computeInitialFire(newRrule, newDtstart, newTz);
+    } else if (
+      input.status === 'active' &&
+      (existing.status === 'paused' || existing.status === 'suspended')
+    ) {
+      // Resuming from paused/suspended: skip any occurrences that were
+      // supposed to fire while it was off so the user doesn't get a flood.
+      const future = computeNextFireAfter(newRrule, newDtstart, newTz, new Date().toISOString());
+      patch.nextFireAt = future;
+      if (future === null) patch.status = 'completed';
     }
 
     const updated = await db

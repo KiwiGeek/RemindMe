@@ -27,6 +27,7 @@ import { renderReminder } from '~/lib/render';
 import { isValidTimeZone, presentUser } from '~/routes/me';
 import {
   computeInitialFire,
+  computeNextFireAfter,
   createReminderBody,
   patchReminderBody,
   presentReminder,
@@ -311,6 +312,13 @@ export const admin = new Hono<AppBindings>()
       if (input.status !== undefined) patch.status = input.status;
       if (scheduleChanged) {
         patch.nextFireAt = computeInitialFire(newRrule, newDtstart, newTz);
+      } else if (
+        input.status === 'active' &&
+        (existing.status === 'paused' || existing.status === 'suspended')
+      ) {
+        const future = computeNextFireAfter(newRrule, newDtstart, newTz, new Date().toISOString());
+        patch.nextFireAt = future;
+        if (future === null) patch.status = 'completed';
       }
 
       const updated = (

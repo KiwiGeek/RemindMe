@@ -281,26 +281,50 @@ backwards causes the verify to fail, surfacing potential cloning.
 
 ## 8. Bounce / Complaint Handling
 
-- Mailgun webhooks subscribed: `permanent_fail`, `temporary_fail`,
-  `complained`, `unsubscribed`.
-- Worker verifies HMAC of `timestamp + token` against the webhook signing key.
-- On **terminal** events (`permanent_fail`, `complained`, `unsubscribed`):
-  - Insert/update `suppressions`.
-  - `UPDATE reminders SET status='suspended' WHERE user_id IN (SELECT id FROM
-    users WHERE email = ?) AND status='active'`.
-  - `UPDATE users SET status='suspended' WHERE email = ?`.
-- On **temporary** events: log only; cron retries naturally.
-- Cron LEFT JOINs `suppressions` and skips matches before sending (defence in
-  depth against races).
-- **Self-recovery:** suspended user can still log in (OTP still sends if the
-  *current* address isn't in Mailgun's own suppression list — sending OTPs
-  through a separate, transactional Mailgun route may be wise, or we use a
-  short manual recovery flow). On successful login, show a banner: "We
-  stopped sending because emails bounced. Reactivate?" Clicking reactivate:
-  - Sets `suppressions.cleared_at = now()`.
-  - Removes the address from Mailgun's suppression list via Mailgun API.
-  - Flips `users.status` back to `active`. User must then individually
-    re-enable each suspended reminder (safer than mass-reactivating).
+Implemented in M5. Endpoint: `POST /webhooks/mailgun`.
+
+- Webhook authenticity: HMAC-SHA256 of `timestamp + token` keyed by
+  `MAILGUN_SIGNING_KEY`. Bad signature or timestamps further than 30
+  minutes from the wall clock are rejected with `401` so Mailgun stops
+  retrying immediately.
+- Per-delivery dedupe: the `token` from Mailgun's signature is stored in
+  KV for 24h; redelivered webhooks return `200 { deduped: true }` without
+  re-processing. The pipeline itself is idempotent so the dedupe is
+  mostly there to keep `audit_log` noise down.
+- Event routing:
+  - `failed` + `severity=permanent` → `suspendAddress` with reason
+    `bounce`.
+  - `complained` → `suspendAddress` with reason `complaint`.
+  - `unsubscribed` → `suspendAddress` with reason `unsubscribe`.
+  - `failed` + `severity=temporary` → audit log only (`soft_bounce`); no
+    state change. Mailgun retries on its own.
+  - Anything else → `200 OK` no-op.
+- `suspendAddress` pipeline (idempotent):
+  - UPSERT a row in `suppressions` (one row per email; `cleared_at` is
+    reset to `NULL` if the row had been cleared previously).
+  - If the email matches a user, set `users.status='suspended'` and flip
+    every `active|paused` reminder of theirs to `status='suspended'`.
+  - Write an audit row (`suppression_bounce` / `..._complaint` /
+    `..._unsubscribe`) with counts.
+  - Suppressions for addresses we have never seen are still recorded so a
+    future signup with that email is gated immediately.
+- The scheduler already left-joins `suppressions` and skips rows where
+  `cleared_at IS NULL`, so the user-suspended flag and the suppression
+  row are independently defensive.
+
+**Self-recovery on OTP sign-in:**
+
+- `POST /api/auth/request` pre-clears the address on Mailgun's
+  suppression list (best-effort) so the OTP can land.
+- `POST /api/auth/verify`, on success, flips `users.status` back to
+  `active` *and* sets `suppressions.cleared_at = now()` for that email.
+  Successful OTP delivery + verification is itself proof the inbox is
+  reachable.
+- Reminders stay `suspended`. The dashboard surfaces a "Reactivate"
+  button per suspended reminder. Reactivation runs through the existing
+  `PATCH /api/reminders/:id { status: 'active' }`; the server computes
+  the next future occurrence so the user doesn't get a flood of backlog
+  emails (same logic applies to long-paused reminders).
 
 ## 9. Frontend UX (sketch)
 
@@ -339,6 +363,11 @@ WCAG AA contrast.
 - Admin routes never impersonate. The admin's session stays the admin's
   session; the target user_id comes only from `:id` in the URL; every
   admin mutation writes to `audit_log`.
+- Mailgun webhooks are authenticated by HMAC-SHA256 over `timestamp +
+  token` keyed by `MAILGUN_SIGNING_KEY`; we reject signatures whose
+  timestamp is more than 30 minutes off the wall clock to bound replay
+  windows. Per-delivery `token` is deduped in KV for 24h to keep
+  redeliveries idempotent.
 
 ## 11. Local & Deploy Workflow
 
@@ -437,8 +466,23 @@ WCAG AA contrast.
    change?}`. SPA exposes the admin console behind a header button that
    only renders when `/api/me` returns `isAdmin: true`. 18 new tests; 112
    total passing.
-8. **M5 — Bounce handling.** Mailgun webhook receiver, suspension logic,
-   self-recovery flow.
+8. ~~**M5 — Bounce handling.**~~ ✅ `POST /webhooks/mailgun` verifies the
+   Mailgun HMAC signature (rejecting >30-min-stale timestamps), dedupes
+   the per-delivery `token` in KV for 24h, and routes events:
+   `permanent_fail` → suspend (reason `bounce`), `complained` → suspend
+   (reason `complaint`), `unsubscribed` → suspend (reason `unsubscribe`),
+   `temporary_fail` → audit-only `soft_bounce`. The suspension pipeline
+   is idempotent: UPSERT `suppressions`, flip `users.status` to
+   `suspended`, suspend `active|paused` reminders, write `audit_log`. On
+   OTP verify, recovery is automatic — `users.status` returns to
+   `active` and `suppressions.cleared_at` is set. Per-reminder
+   reactivation stays opt-in: the dashboard renders a green "Reactivate"
+   button for suspended reminders, and the server recomputes
+   `next_fire_at` to the first future occurrence so neither
+   reactivation nor "resume after a long pause" floods the inbox with
+   backlog. 12 new tests (signature/replay/dedupe gating, every event
+   branch, soft-bounce no-op, suppression for unknown emails, full
+   recovery round-trip, backlog avoidance); 142 total passing.
 9. **M6 — Polish & launch.** Custom domain DNS, production secrets,
    accessibility pass, README, deploy.
 

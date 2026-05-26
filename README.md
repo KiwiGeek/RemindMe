@@ -8,6 +8,21 @@ contributor conventions.
 
 ## Status
 
+**M5 — Bounce handling shipped.** `POST /webhooks/mailgun` accepts
+Mailgun's webhook events (signed HMAC-SHA256 over `timestamp + token`,
+±30-min replay window, per-delivery `token` deduped in KV for 24h).
+Hard bounces, complaints, and Mailgun-level unsubscribes suspend the
+address: the local `suppressions` row is upserted, the matching user is
+flipped to `suspended`, and their active/paused reminders go to
+`suspended` too — all idempotent. Soft bounces are audit-only; Mailgun
+retries on its own. Recovery is automatic on the next OTP sign-in: the
+user proving they own the inbox flips `users.status` back to `active`
+and clears the suppression row. Per-reminder reactivation stays opt-in
+— the dashboard renders a green "Reactivate" button on each suspended
+reminder, and the server recomputes `next_fire_at` so neither
+reactivation nor "resume after a long pause" floods the inbox with
+backlog emails.
+
 **M4.6 — Optional passkey sign-in shipped.** Users can opt in to passkey
 auth from the dashboard's Passkeys section (Touch ID, Windows Hello,
 1Password, etc.). The sign-in screen offers a "Sign in with a passkey"
@@ -134,6 +149,46 @@ ADMIN_EMAILS = "admin@example.com,ops@example.com"
 
 Then `npm run deploy`. Affected accounts pick up the new role on their
 next `GET /api/me`.
+
+### Mailgun webhook setup (M5)
+
+Bounce/complaint handling requires Mailgun to POST events to the Worker.
+Once deployed:
+
+1. Mailgun dashboard → **Sending → Webhooks** → pick the sending domain
+   (`example.com`).
+2. For each of these events, set the URL to
+   `https://remindme.example.com/webhooks/mailgun`:
+   - **Permanent Failure** (hard bounce → suspend)
+   - **Temporary Failure** (soft bounce → audit-only)
+   - **Spam Complaint** (suspend)
+   - **Unsubscribes** (suspend)
+3. Confirm `MAILGUN_SIGNING_KEY` matches the **HTTP webhook signing key**
+   shown on the same dashboard page. It's set via
+   `wrangler secret put MAILGUN_SIGNING_KEY` (see first-time setup).
+
+Mailgun retries 4xx/5xx for up to 8 hours, so it's safe to deploy the
+secret rotation and the worker at the same time — any in-flight retries
+will simply succeed on the next attempt. Redeliveries are deduped by
+the per-delivery `token` in KV for 24h, so they're a no-op after the
+first successful processing.
+
+To verify locally without Mailgun, you can send a hand-signed event
+against `wrangler dev`:
+
+```bash
+node -e '
+const ts = Math.floor(Date.now() / 1000);
+const tok = "local-" + Math.random();
+const k = process.env.MAILGUN_SIGNING_KEY;
+require("crypto").createHmac("sha256", k).update(ts + tok).digest("hex");
+console.log({ ts, tok, sig: require("crypto").createHmac("sha256", k).update(ts + tok).digest("hex") });
+'
+```
+
+…and POST the resulting envelope to `http://localhost:8787/webhooks/mailgun`.
+A bad signature returns `401`; a valid one returns `200` with what
+action was taken.
 
 ### Manually firing a scheduler tick
 

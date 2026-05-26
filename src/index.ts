@@ -11,6 +11,7 @@ import { me } from '~/routes/me';
 import { passkeysRoute } from '~/routes/passkeys';
 import { r } from '~/routes/r';
 import { remindersRoute } from '~/routes/reminders';
+import { webhooks } from '~/routes/webhooks';
 
 const app = new Hono<AppBindings>();
 
@@ -26,6 +27,7 @@ app.route('/api/me', me);
 app.route('/api/reminders', remindersRoute);
 app.route('/api/passkeys', passkeysRoute);
 app.route('/api/admin', admin);
+app.route('/webhooks', webhooks);
 app.route('/r', r);
 
 app.onError((err, c) => {
