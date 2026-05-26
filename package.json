@@ -27,7 +27,7 @@
     "@hono/zod-validator": "^0.8.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.0",
-    "drizzle-orm": "^0.36.4",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.6.14",
     "luxon": "^3.5.0",
     "markdown-it": "^14.1.0",
@@ -37,22 +37,31 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@cloudflare/vitest-pool-workers": "^0.5.40",
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
     "@cloudflare/workers-types": "^4.20241224.0",
     "@preact/preset-vite": "^2.9.1",
     "@tailwindcss/vite": "^4.0.0",
     "@types/luxon": "^3.4.2",
     "@types/markdown-it": "^14.1.2",
+    "@types/node": "^20.19.41",
     "concurrently": "^9.1.0",
-    "drizzle-kit": "^0.30.1",
+    "drizzle-kit": "^0.31.10",
     "preact": "^10.25.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.5",
-    "vitest": "^2.1.8",
-    "wrangler": "^3.99.0"
+    "vite": "^6.4.2",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.95.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.0"
+    },
+    "tsyringe": {
+      "tslib": "^2.6.0"
+    }
   }
 }
