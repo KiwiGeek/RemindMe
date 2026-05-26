@@ -321,4 +321,22 @@ See [`AGENTS.md`](./AGENTS.md#repository-layout-target).
 
 ## License
 
-Private — no license granted.
+Copyright (C) 2026 Joshua Penman. Released under the [GNU Affero
+General Public License v3.0 or later](./LICENSE) (AGPLv3+).
+
+In plain terms:
+
+- **Self-hosting an unmodified copy with your own config** (Mailgun
+  domain, admin emails, etc.) — go for it, no obligation back.
+- **Modifying the code and running it** so other people can interact
+  with it over a network — you must offer your users access to the
+  modified source under the same license. This is what AGPL is for:
+  it closes the SaaS loophole that plain GPL leaves open.
+- **Redistributing the code** (forking, mirroring, packaging) — must
+  carry the LICENSE and offer source.
+- **No warranty.** See LICENSE for the full disclaimer — it's the same
+  "use at your own risk" idea baked into the sign-in footer.
+
+If you're unsure whether your use case triggers the share-back
+obligation, the [AGPLv3 page on gnu.org](https://www.gnu.org/licenses/agpl-3.0.html)
+is the authoritative source.

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Passwordless recurring reminder email service on Cloudflare Workers + Mailgun.",
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "dev": "concurrently -n worker,web -c blue,green \"npm:dev:worker\" \"npm:dev:web\"",
     "dev:worker": "wrangler d1 migrations apply remindme --local && wrangler dev --test-scheduled",
