@@ -1,4 +1,16 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useMemo } from 'preact/hooks';
+
+/**
+ * Fully controlled recurrence picker. The single source of truth is the
+ * `value` prop (the RRULE string in the parent's form state). We derive the
+ * UI shape from `value` via `useMemo` and emit changes through `onChange`
+ * from each event handler — no internal state, no effects.
+ *
+ * Earlier versions kept a parallel `pattern` state synced via `useEffect`,
+ * which caused an infinite render loop because the parent passes a fresh
+ * inline `onChange`, the effect re-fires every render, and each emit
+ * triggers another render in the parent.
+ */
 
 export type RecurrencePattern =
   | { kind: 'daily' }
@@ -27,12 +39,17 @@ interface Props {
 }
 
 export function RecurrencePicker({ value, onChange }: Props) {
-  const initialPattern = useMemo(() => parseRrule(value), [value]);
-  const [pattern, setPattern] = useState<RecurrencePattern>(initialPattern);
+  const pattern = useMemo(() => parseRrule(value), [value]);
 
-  useEffect(() => {
-    onChange(buildRrule(pattern));
-  }, [pattern, onChange]);
+  function selectKind(kind: RecurrencePattern['kind']) {
+    onChange(buildRrule(defaultPattern(kind)));
+  }
+
+  function toggleDay(code: WeekDay) {
+    const current = pattern.kind === 'weekly' ? pattern.days : [];
+    const next = current.includes(code) ? current.filter((d) => d !== code) : [...current, code];
+    onChange(buildRrule({ kind: 'weekly', days: next.length === 0 ? ['MO'] : next }));
+  }
 
   return (
     <div class="space-y-3">
@@ -42,10 +59,9 @@ export function RecurrencePicker({ value, onChange }: Props) {
       <select
         id="recurrence-kind"
         value={pattern.kind}
-        onChange={(e) => {
-          const k = (e.currentTarget as HTMLSelectElement).value as RecurrencePattern['kind'];
-          setPattern(defaultPattern(k));
-        }}
+        onChange={(e) =>
+          selectKind((e.currentTarget as HTMLSelectElement).value as RecurrencePattern['kind'])
+        }
         class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
       >
         <option value="daily">Every day</option>
@@ -64,14 +80,7 @@ export function RecurrencePicker({ value, onChange }: Props) {
               <button
                 key={code}
                 type="button"
-                onClick={() =>
-                  setPattern({
-                    kind: 'weekly',
-                    days: selected
-                      ? pattern.days.filter((d) => d !== code)
-                      : [...pattern.days, code],
-                  })
-                }
+                onClick={() => toggleDay(code)}
                 class={`rounded-md border px-2 py-1 text-xs font-medium ${
                   selected
                     ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
@@ -90,7 +99,12 @@ export function RecurrencePicker({ value, onChange }: Props) {
           <input
             value={pattern.rrule}
             onInput={(e) =>
-              setPattern({ kind: 'custom', rrule: (e.currentTarget as HTMLInputElement).value })
+              onChange(
+                buildRrule({
+                  kind: 'custom',
+                  rrule: (e.currentTarget as HTMLInputElement).value,
+                }),
+              )
             }
             placeholder="FREQ=DAILY;INTERVAL=2"
             class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
