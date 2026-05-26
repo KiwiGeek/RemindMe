@@ -6,7 +6,7 @@
   "description": "Passwordless recurring reminder email service on Cloudflare Workers + Mailgun.",
   "scripts": {
     "dev": "concurrently -n worker,web -c blue,green \"npm:dev:worker\" \"npm:dev:web\"",
-    "dev:worker": "wrangler dev",
+    "dev:worker": "wrangler d1 migrations apply remindme --local && wrangler dev",
     "dev:web": "vite --config web/vite.config.ts",
     "build": "npm run build:web && npm run build:worker",
     "build:web": "vite build --config web/vite.config.ts",

@@ -49,6 +49,13 @@ npx wrangler secret put OTP_PEPPER
 npx wrangler secret put ACTION_TOKEN_SECRET
 ```
 
+> **Important:** `.dev.vars` (local) and `wrangler secret put` (production)
+> are independent stores. Setting a production secret does **not** make it
+> available to `wrangler dev`, and vice versa. You need to populate both
+> for any secret you want to use in both environments. The Worker logs a
+> loud warning on first request if any required secret is missing or still
+> set to the placeholder from `.dev.vars.example`.
+
 ## Day-to-day
 
 ```bash
