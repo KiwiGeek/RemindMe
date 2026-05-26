@@ -205,6 +205,51 @@ runs the real Mailgun send for any due reminder, so make sure
 `MAILGUN_API_KEY` in `.dev.vars` is the real key (not the placeholder) if
 you want emails to actually land.
 
+The cron handler also prunes `reminder_fires` and `audit_log` rows
+older than 30 days. The prune runs *after* the send tick and is wrapped
+in its own try/catch, so a failure there can never block a send. See
+`src/lib/retention.ts`.
+
+## Theme (light / dark)
+
+The toggle in the page header cycles between **System** (follows the
+OS), **Light**, and **Dark**. The choice persists in `localStorage`.
+An inline script in `web/index.html` applies the right class before
+React mounts so there's no flash of the wrong theme on first paint; see
+`web/src/hooks/useTheme.ts` for the runtime side.
+
+## Going live — pre-flight checklist
+
+Run through this list before announcing the service. Everything is
+also covered in detail elsewhere in this README; this section is the
+short version to make sure nothing was missed.
+
+- **DNS**: `remindme.example.com` is a CNAME (or routes via Cloudflare
+  proxy) to the Worker. `wrangler.toml` declares the custom domain so
+  Cloudflare provisions DNS + SSL on first deploy. After `npm run
+  deploy`, hit `https://remindme.example.com/api/healthz` — should
+  return `200 {"ok":true}`.
+- **Mailgun sending domain**: `example.com` (apex) verified, tracking
+  records in place, "EU vs US" region matches `MAILGUN_REGION` in
+  `wrangler.toml`.
+- **Secrets** present in production (set via `wrangler secret put`):
+  `MAILGUN_API_KEY`, `MAILGUN_SIGNING_KEY`, `SESSION_SECRET`,
+  `OTP_PEPPER`, `ACTION_TOKEN_SECRET`. The Worker logs a loud warning on
+  first request if any are still set to the `.dev.vars.example`
+  placeholder values.
+- **Mailgun webhooks** point at
+  `https://remindme.example.com/webhooks/mailgun` for **Permanent
+  Failure**, **Temporary Failure**, **Spam Complaint**, and
+  **Unsubscribes**. See [Mailgun webhook setup](#mailgun-webhook-setup-m5).
+- **Admin emails** in `wrangler.toml`'s `ADMIN_EMAILS` reflect the real
+  operator list (it's a CSV, case-insensitive). Changes need a redeploy.
+- **Cron trigger**: `wrangler.toml` declares `*/5 * * * *`, which is
+  Cloudflare's free-plan minimum. The scheduler looks 6 minutes ahead so
+  emails arrive on time or slightly early, never late.
+- **CI** (`.github/workflows/ci.yml`) runs lint + typecheck + tests +
+  build on every push to `main` and every PR. There's no auto-deploy
+  step — releases are still triggered manually with `npm run deploy`.
+
 ## Layout
 
 See [`AGENTS.md`](./AGENTS.md#repository-layout-target).

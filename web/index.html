@@ -4,8 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Passwordless self-serve recurring email reminders." />
     <title>Remind Me</title>
-    <link rel="icon" href="data:," />
+    <!-- Inline SVG bell so we avoid a separate HTTP round-trip for the
+         favicon. `currentColor` makes it adapt to dark/light tabs in
+         browsers that honour the data: URL's color-scheme. -->
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2318181b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9'/><path d='M10.3 21a1.94 1.94 0 0 0 3.4 0'/></svg>"
+    />
     <script>
       // Apply the user's theme preference before paint so the page never
       // flashes the wrong scheme. Mirrors the logic in useTheme.ts —

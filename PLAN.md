@@ -483,8 +483,25 @@ WCAG AA contrast.
    backlog. 12 new tests (signature/replay/dedupe gating, every event
    branch, soft-bounce no-op, suppression for unknown emails, full
    recovery round-trip, backlog avoidance); 142 total passing.
-9. **M6 — Polish & launch.** Custom domain DNS, production secrets,
-   accessibility pass, README, deploy.
+9. ~~**M6 — Polish & launch.**~~ ✅ Retention pruning runs from the
+   cron handler after each send tick (`src/lib/retention.ts`): deletes
+   `reminder_fires` rows older than 30 days whose status is terminal
+   (`sent`/`skipped`, never `queued`/`failed` so the retry path is
+   intact) and `audit_log` rows older than 30 days; wrapped in its own
+   try/catch so a prune failure can't block a send. Three-state theme
+   toggle (System / Light / Dark) wired into every header with a
+   localStorage-backed pre-mount script that paints the right theme
+   without FOUC. Real SVG favicon (bell glyph) replacing the
+   `data:,` placeholder, plus a `<meta name="description">`. A11y pass:
+   `scope="col"` on table headers, `aria-label` on each action button
+   so screen-reader users get reminder context, `role="alert"` on every
+   error banner, `aria-busy`/`aria-live` on the loading shell. GitHub
+   Actions CI (`.github/workflows/ci.yml`) runs lint + typecheck +
+   tests + build on push to `main` and on every PR; releases stay
+   manual (`npm run deploy`) so a misconfigured CI can't accidentally
+   ship. README rewritten with a pre-flight launch checklist plus
+   sections on theme behaviour and retention. 6 new retention tests;
+   148 total passing.
 
 ## 14. Resolved Decisions Log
 

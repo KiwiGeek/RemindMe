@@ -83,10 +83,18 @@ export function RemindersList({
       <table class="w-full text-left text-sm">
         <thead class="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-900">
           <tr>
-            <th class="px-3 py-2 font-medium">Reminder</th>
-            <th class="px-3 py-2 font-medium">Next</th>
-            <th class="px-3 py-2 font-medium">Status</th>
-            <th class="px-3 py-2 font-medium" />
+            <th scope="col" class="px-3 py-2 font-medium">
+              Reminder
+            </th>
+            <th scope="col" class="px-3 py-2 font-medium">
+              Next
+            </th>
+            <th scope="col" class="px-3 py-2 font-medium">
+              Status
+            </th>
+            <th scope="col" class="px-3 py-2 font-medium">
+              <span class="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -109,6 +117,7 @@ export function RemindersList({
                       type="button"
                       disabled={busyId === r.id}
                       onClick={() => void reactivate(r)}
+                      aria-label={`Reactivate ${r.title}`}
                       class="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 dark:hover:bg-emerald-900"
                     >
                       Reactivate
@@ -118,6 +127,7 @@ export function RemindersList({
                       type="button"
                       disabled={busyId === r.id || r.status === 'completed'}
                       onClick={() => void togglePause(r)}
+                      aria-label={`${r.status === 'paused' ? 'Resume' : 'Pause'} ${r.title}`}
                       class="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
                     >
                       {r.status === 'paused' ? 'Resume' : 'Pause'}
@@ -126,6 +136,7 @@ export function RemindersList({
                   <button
                     type="button"
                     onClick={() => onEdit(r)}
+                    aria-label={`Edit ${r.title}`}
                     class="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
                   >
                     Edit
@@ -134,6 +145,7 @@ export function RemindersList({
                     type="button"
                     disabled={busyId === r.id}
                     onClick={() => void remove(r)}
+                    aria-label={`Delete ${r.title}`}
                     class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950"
                   >
                     Delete

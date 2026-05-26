@@ -39,7 +39,13 @@ export function App() {
 
   if (state.kind === 'loading') {
     return (
-      <main class="flex min-h-screen items-center justify-center text-zinc-500">Loading…</main>
+      <main
+        aria-busy="true"
+        aria-live="polite"
+        class="flex min-h-screen items-center justify-center text-zinc-500"
+      >
+        Loading…
+      </main>
     );
   }
 

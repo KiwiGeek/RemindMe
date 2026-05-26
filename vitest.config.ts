@@ -15,6 +15,14 @@ export default defineWorkersConfig(async () => {
       setupFiles: ['./src/tests/setup.ts'],
       poolOptions: {
         workers: {
+          // singleWorker forces all test files into one Miniflare instance.
+          // Without this on Windows, workerd's localhost fallback module
+          // service occasionally has its loopback connections refused
+          // (Win32 #52 / #1225) when multiple Miniflare instances spin up
+          // in parallel, causing flakes like
+          // "No such module .../tsyringe/.../singleton". Tests run a touch
+          // slower in single-worker mode but are deterministic.
+          singleWorker: true,
           wrangler: { configPath: './wrangler.toml' },
           miniflare: {
             compatibilityFlags: ['nodejs_compat'],

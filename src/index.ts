@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import { logger } from 'hono/logger';
 import type { AppBindings, Env } from '~/env';
 import { checkEnv } from '~/lib/envCheck';
+import { pruneOldRows } from '~/lib/retention';
 import { runScheduledTick } from '~/lib/scheduler';
 import { admin } from '~/routes/admin';
 import { auth } from '~/routes/auth';
@@ -54,6 +55,17 @@ export default {
           console.log('scheduler tick', stats);
         } catch (err) {
           console.error('scheduler tick failed', err);
+        }
+        // Retention pruning runs after the send tick so a prune failure
+        // can never block a send. It's also wrapped in its own try/catch
+        // for the same reason; the next tick (5 min away) will retry.
+        try {
+          const pruned = await pruneOldRows(env, new Date(event.scheduledTime));
+          if (pruned.firesDeleted > 0 || pruned.auditDeleted > 0) {
+            console.log('retention prune', pruned);
+          }
+        } catch (err) {
+          console.error('retention prune failed', err);
         }
       })(),
     );
