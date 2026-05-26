@@ -8,8 +8,10 @@ contributor conventions.
 
 ## Status
 
-**M0 — Scaffold.** Worker + SPA boot, `/api/healthz` returns ok, cron is wired
-as a no-op. No auth, no reminders, no sending yet.
+**M3 — Scheduler shipped.** Auth, full reminders CRUD, and a cron-driven
+sender are all live on `main`. The scheduler runs `*/5 * * * *` with a
+6-minute look-ahead so reminders arrive on or slightly before their
+scheduled minute, never late.
 
 ## Stack
 
@@ -69,6 +71,21 @@ npm run deploy       # build SPA + wrangler deploy
 
 In dev, the Vite server proxies `/api/*` and `/r/*` to the Worker so the SPA
 talks to the same origin as in production.
+
+### Manually firing a scheduler tick
+
+`wrangler dev` is started with `--test-scheduled`, which exposes
+`GET /__scheduled` on the Worker port (8787). Hit it to run the cron handler
+exactly as Cloudflare would:
+
+```bash
+curl 'http://localhost:8787/__scheduled?cron=*/5+*+*+*+*'
+```
+
+The `cron=` query is optional when there's only one schedule. The handler
+runs the real Mailgun send for any due reminder, so make sure
+`MAILGUN_API_KEY` in `.dev.vars` is the real key (not the placeholder) if
+you want emails to actually land.
 
 ## Layout
 
