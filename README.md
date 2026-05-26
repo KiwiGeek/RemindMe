@@ -6,49 +6,6 @@ tier) and delivers via Mailgun. Lives at <https://remindme.example.com>.
 See [`PLAN.md`](./PLAN.md) for the design and [`AGENTS.md`](./AGENTS.md) for
 contributor conventions.
 
-## Status
-
-**M5 — Bounce handling shipped.** `POST /webhooks/mailgun` accepts
-Mailgun's webhook events (signed HMAC-SHA256 over `timestamp + token`,
-±30-min replay window, per-delivery `token` deduped in KV for 24h).
-Hard bounces, complaints, and Mailgun-level unsubscribes suspend the
-address: the local `suppressions` row is upserted, the matching user is
-flipped to `suspended`, and their active/paused reminders go to
-`suspended` too — all idempotent. Soft bounces are audit-only; Mailgun
-retries on its own. Recovery is automatic on the next OTP sign-in: the
-user proving they own the inbox flips `users.status` back to `active`
-and clears the suppression row. Per-reminder reactivation stays opt-in
-— the dashboard renders a green "Reactivate" button on each suspended
-reminder, and the server recomputes `next_fire_at` so neither
-reactivation nor "resume after a long pause" floods the inbox with
-backlog emails.
-
-**M4.6 — Optional passkey sign-in shipped.** Users can opt in to passkey
-auth from the dashboard's Passkeys section (Touch ID, Windows Hello,
-1Password, etc.). The sign-in screen offers a "Sign in with a passkey"
-button next to the email form. Passkeys are layered on top of email OTP
-— OTP still works for every account, so deleting your last passkey is
-never a lockout. Authentication uses discoverable credentials (no email
-entered; the browser picks the passkey). RP ID and expected origin are
-derived per-request from the `Origin` header, so `localhost` and
-`remindme.example.com` both work without env churn.
-
-**M4.5 — Admin console shipped.** Operators listed in `ADMIN_EMAILS` get
-an `Admin` button in the header that opens a separate console for
-managing other users' reminders. Admins can search users, create users
-who have never signed in (the standard OTP flow later claims the row),
-change a target's timezone, and full-CRUD any reminder. Every admin
-mutation lands in `audit_log`. The target user_id always comes from the
-URL, never the session — admins do not impersonate.
-
-**M4 — Email actions shipped.** Outgoing reminders carry signed one-click
-links for snooze (5 durations), skip-next, mark-done (with confirm step),
-per-series unsubscribe, and a magic-link "Manage all your reminders"
-footer link. RFC 8058 `List-Unsubscribe` headers wire Gmail/Apple Mail's
-native Unsubscribe button to the same per-fire action. Tokens are
-HMAC-signed, kind-tagged (`fa.` / `ml.`), single-use via
-`reminder_fires.action_consumed_at`, 30-day TTL.
-
 ## Stack
 
 TypeScript · Hono · Cloudflare D1 + Drizzle · Workers KV · Workers Cron · Vite +
@@ -150,7 +107,7 @@ ADMIN_EMAILS = "admin@example.com,ops@example.com"
 Then `npm run deploy`. Affected accounts pick up the new role on their
 next `GET /api/me`.
 
-### Mailgun webhook setup (M5)
+### Mailgun webhook setup
 
 Bounce/complaint handling requires Mailgun to POST events to the Worker.
 Once deployed:
@@ -240,7 +197,7 @@ short version to make sure nothing was missed.
 - **Mailgun webhooks** point at
   `https://remindme.example.com/webhooks/mailgun` for **Permanent
   Failure**, **Temporary Failure**, **Spam Complaint**, and
-  **Unsubscribes**. See [Mailgun webhook setup](#mailgun-webhook-setup-m5).
+  **Unsubscribes**. See [Mailgun webhook setup](#mailgun-webhook-setup).
 - **Admin emails** in `wrangler.toml`'s `ADMIN_EMAILS` reflect the real
   operator list (it's a CSV, case-insensitive). Changes need a redeploy.
 - **Cron trigger**: `wrangler.toml` declares `*/5 * * * *`, which is
