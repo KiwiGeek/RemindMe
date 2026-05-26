@@ -5,12 +5,6 @@ on:
     branches: [main]
   pull_request:
 
-# Cancel a previous in-flight run if the user force-pushes — the new
-# commit is the only one we care about.
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
@@ -19,6 +13,12 @@ jobs:
     name: lint · typecheck · test · build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Cancel a previous in-flight check if the user force-pushes / pushes
+    # again to the same ref. Scoped to the check job so it can't cancel
+    # an in-flight deploy (see the `deploy` job below).
+    concurrency:
+      group: check-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v4
@@ -42,3 +42,49 @@ jobs:
 
       - name: Build (SPA + worker dry-run)
         run: npm run build
+
+  deploy:
+    name: deploy to Cloudflare Workers
+    needs: check
+    # Push to main only — never PRs and never tag pushes. PRs from forks
+    # also wouldn't have access to the secret, so gating here keeps the
+    # workflow readable.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Serialise deploys (one at a time, queue the rest) and *never* cancel
+    # an in-flight one — interrupting `wrangler d1 migrations apply` or
+    # `wrangler deploy` mid-flight risks a half-applied migration or a
+    # half-uploaded worker version. Pushes that arrive while a deploy is
+    # running will queue, then run, so every green commit on main ships.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    # Optional GitHub Environment so the deploy shows up in the repo's
+    # "Environments" sidebar with history + URL. If you ever want manual
+    # approval gates, add a required reviewer to this environment in the
+    # repo settings — no workflow change required.
+    environment:
+      name: production
+      url: https://remindme.example.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy (apply remote D1 migrations + push worker)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # `wrangler d1 migrations apply --remote` prompts interactively
+          # outside CI; GitHub Actions sets CI=true automatically, which
+          # wrangler treats as non-interactive. We set it again explicitly
+          # so the behaviour is obvious from reading the workflow.
+          CI: "true"
+        run: npm run deploy

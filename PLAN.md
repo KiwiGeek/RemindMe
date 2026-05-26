@@ -420,8 +420,15 @@ WCAG AA contrast.
 - One `wrangler.toml`; production binds the `remindme.example.com` custom
   domain. No separate `staging` env yet — add one if/when needed.
 - GitHub Actions CI (`.github/workflows/ci.yml`) runs lint + typecheck +
-  tests + build on push to `main` and on every PR. Deploy stays manual
-  (`npm run deploy`) so a misconfigured workflow can't accidentally ship.
+  tests + build on push to `main` and on every PR. Pushes to `main` also
+  trigger auto-deploy in a second job gated on the check job being
+  green; the deploy job runs `npm run deploy` (build SPA → apply remote
+  D1 migrations → `wrangler deploy`) with a `CLOUDFLARE_API_TOKEN`
+  GitHub secret. Concurrency is per-job: a follow-up push cancels an
+  in-flight check but never an in-flight deploy, so half-applied
+  migrations or half-uploaded Worker versions aren't possible. Deploys
+  queue and run in commit order. `npm run deploy` from a laptop still
+  works for hotfixes from feature branches.
 
 ## 12. Out of Scope (v1)
 

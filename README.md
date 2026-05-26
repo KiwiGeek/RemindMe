@@ -167,6 +167,48 @@ older than 30 days. The prune runs *after* the send tick and is wrapped
 in its own try/catch, so a failure there can never block a send. See
 `src/lib/retention.ts`.
 
+## Auto-deploy from `main`
+
+Every push to `main` runs CI (lint + typecheck + tests + build) and, if
+that job is green, runs the deploy job — same steps as `npm run deploy`
+locally (build SPA → apply remote D1 migrations → `wrangler deploy`).
+Concurrency is scoped per-job: a second push to `main` cancels an
+in-flight check but **never** an in-flight deploy, so a half-applied
+migration or a half-uploaded Worker version isn't possible. Deploys
+queue and run in order.
+
+### One-time secret setup
+
+The deploy job needs a Cloudflare API token in the GitHub repo secrets
+as `CLOUDFLARE_API_TOKEN`.
+
+1. Cloudflare dashboard → **My Profile → API Tokens → Create Token →
+   Custom token**. Give it these permissions (all *Edit* unless noted):
+   - **Account** · Workers Scripts · Edit
+   - **Account** · D1 · Edit
+   - **Account** · Workers KV Storage · Edit
+   - **Account** · Account Settings · Read
+   - **User** · User Details · Read
+   - **Zone** · Workers Routes · Edit (only needed if you ever rebind
+     the custom domain; safe to include)
+
+   Scope the token to your single account and zone so a leak is bounded.
+
+2. GitHub repo → **Settings → Secrets and variables → Actions → New
+   repository secret**. Name it `CLOUDFLARE_API_TOKEN`, paste the value,
+   save.
+
+3. (Optional) Repo → **Settings → Environments → New environment →
+   `production`**. The workflow already references this environment so
+   deploys show up in the repo's Environments sidebar with history.
+   Adding a required reviewer here turns auto-deploy into "deploy on
+   approval" without any workflow change.
+
+After the secret exists, the next push to `main` deploys automatically.
+If you ever need to ship from a feature branch (e.g. for a hotfix that
+hasn't been merged), `npm run deploy` from your laptop still works
+exactly as before — auto-deploy is additive, not a replacement.
+
 ## Theme (light / dark)
 
 The toggle in the page header cycles between **System** (follows the
@@ -204,8 +246,11 @@ short version to make sure nothing was missed.
   Cloudflare's free-plan minimum. The scheduler looks 6 minutes ahead so
   emails arrive on time or slightly early, never late.
 - **CI** (`.github/workflows/ci.yml`) runs lint + typecheck + tests +
-  build on every push to `main` and every PR. There's no auto-deploy
-  step — releases are still triggered manually with `npm run deploy`.
+  build on every push to `main` and every PR. **Pushes to `main` also
+  auto-deploy** (in a second job that only runs if the check job is
+  green). See [Auto-deploy from `main`](#auto-deploy-from-main) for the
+  one-time secret setup; until that secret exists the deploy step will
+  fail loudly but the check job still gates merges as before.
 
 ## Layout
 
