@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import { logger } from 'hono/logger';
 import type { AppBindings, Env } from '~/env';
 import { checkEnv } from '~/lib/envCheck';
+import { runScheduledTick } from '~/lib/scheduler';
 import { auth } from '~/routes/auth';
 import { healthz } from '~/routes/healthz';
 import { me } from '~/routes/me';
@@ -36,7 +37,17 @@ app.onError((err, c) => {
 export default {
   fetch: app.fetch,
 
-  async scheduled(_event: ScheduledController, _env: Env, _ctx: ExecutionContext) {
-    // Cron tick. Reminder dispatch lands in M3.
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    checkEnv(env);
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const stats = await runScheduledTick(env, new Date(event.scheduledTime));
+          console.log('scheduler tick', stats);
+        } catch (err) {
+          console.error('scheduler tick failed', err);
+        }
+      })(),
+    );
   },
 } satisfies ExportedHandler<Env>;

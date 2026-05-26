@@ -41,9 +41,13 @@ Constraints:
 | HTTP API + static SPA | Workers (with Static Assets) | 100k requests/day |
 | Relational data | D1 (SQLite) | 5M reads / 100k writes per day, 5 GB |
 | OTP + rate-limit counters | Workers KV | 100k reads / 1k writes per day, native TTL |
-| Scheduling tick | Cron Triggers | 1-min granularity, ≤ 5 schedules / Worker |
+| Scheduling tick | Cron Triggers | ~5-min effective granularity on free tier |
 | Secrets | Worker secrets | `wrangler secret put …` |
 | Observability | Workers Logs (tail) | included |
+
+The scheduler runs `*/5 * * * *` and queries a **6-minute look-ahead
+window** so reminders always fire on or before their scheduled minute,
+never noticeably late, even when ticks jitter.
 
 No Queues, no Durable Objects, no Workers Paid plan. D1 + Cron is sufficient at
 expected volume; we can graduate to DO alarms later if fan-out grows.
@@ -344,8 +348,17 @@ WCAG AA contrast.
    rendered email; SPA dashboard with list, create/edit form, recurrence
    picker (common patterns + custom RRULE), debounced live preview,
    pause/resume/delete actions; 67 tests passing. No sending yet.
-4. **M3 — Scheduler.** Cron handler firing reminders; RRULE → next-fire
-   calculation; `reminder_fires` log; idempotency.
+4. ~~**M3 — Scheduler.**~~ ✅ `*/5 * * * *` cron with 6-minute look-ahead
+   so emails arrive on time or slightly early, never late. Per-fire
+   idempotency via `reminder_fires(reminder_id, fire_at)` unique lock
+   (raw `INSERT … ON CONFLICT DO UPDATE … WHERE status IN
+   ('queued','failed')`) plus a deterministic `Message-Id`
+   (`<reminder-{id}-{fire_at}@example.com>`) for receiver-side dedup.
+   `runScheduledTick()` joins users, skips suspended owners,
+   defensively skips entries already in `suppressions`, decrements
+   `remaining_count`, marks completed when exhausted, and retries
+   failed sends on the next tick. 50-reminder per-tick cap so a backlog
+   can't blow CPU budget. 9 scheduler tests; 76 total passing.
 5. **M4 — Email actions.** Snooze / skip / mark done / manage page; action
    token plumbing; List-Unsubscribe header.
 6. **M5 — Bounce handling.** Mailgun webhook receiver, suspension logic,

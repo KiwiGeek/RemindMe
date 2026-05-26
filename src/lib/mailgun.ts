@@ -26,6 +26,12 @@ export interface SendMessageInput {
   tags?: string[];
   /** RFC 8058 one-click unsubscribe target. */
   listUnsubscribe?: string;
+  /**
+   * Optional RFC 5322 Message-Id (without angle brackets). Passed through as
+   * the `h:Message-Id` header so retries with the same value give recipients
+   * something to dedupe on if our own row-level lock ever loses the race.
+   */
+  messageId?: string;
 }
 
 export interface SendMessageResult {
@@ -65,6 +71,9 @@ export class MailgunClient {
     if (input.listUnsubscribe) {
       form.set('h:List-Unsubscribe', `<${input.listUnsubscribe}>`);
       form.set('h:List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+    }
+    if (input.messageId) {
+      form.set('h:Message-Id', `<${input.messageId}>`);
     }
 
     const res = await fetch(`${this.base}/messages`, {
