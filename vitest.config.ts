@@ -51,6 +51,15 @@ export default defineWorkersConfig(async () => {
               // Plumb migration metadata through so setup.ts can apply them
               // against the test-scoped D1 database.
               TEST_MIGRATIONS: migrations,
+              // Deterministic per-deploy config. These used to live in
+              // wrangler.toml's [vars] but were moved to Cloudflare secrets
+              // for production, so we have to re-provide them here for the
+              // test pool (which would otherwise see them as undefined).
+              SITE_ORIGIN: 'http://localhost:8787',
+              MAILGUN_DOMAIN: 'example.com',
+              MAILGUN_FROM: 'Remind Me <reminders@example.com>',
+              MAILGUN_REPLY_TO: 'no-reply@example.com',
+              ADMIN_EMAILS: 'admin@example.com,super@example.com',
               // Override Mailgun + crypto config with deterministic values so
               // tests don't depend on real secrets being set in .dev.vars.
               MAILGUN_API_KEY: 'test-api-key',
@@ -58,7 +67,6 @@ export default defineWorkersConfig(async () => {
               SESSION_SECRET: 'test-session-secret-aaaaaaaaaaaaaaaaaaaaaaaaaa',
               OTP_PEPPER: 'test-otp-pepper-bbbbbbbbbbbbbbbbbbbbbbbbbbbb',
               ACTION_TOKEN_SECRET: 'test-action-token-secret-cccccccccccccccccc',
-              ADMIN_EMAILS: 'admin@example.com,super@example.com',
             },
           },
         },

@@ -17,7 +17,7 @@ function mockMailgunSendOnce(): { capturedBody: { value: string | null } } {
   for (let i = 0; i < 3; i++) {
     pool
       .intercept({
-        path: /^\/v3\/penman\.dev\/(bounces|unsubscribes|complaints)\//,
+        path: /^\/v3\/example\.com\/(bounces|unsubscribes|complaints)\//,
         method: 'DELETE',
       })
       .reply(404, '{}');
@@ -96,7 +96,7 @@ describe('POST /api/auth/request', () => {
     for (let i = 0; i < 3; i++) {
       pool
         .intercept({
-          path: /^\/v3\/penman\.dev\/(bounces|unsubscribes|complaints)\//,
+          path: /^\/v3\/example\.com\/(bounces|unsubscribes|complaints)\//,
           method: 'DELETE',
         })
         .reply(401, '{"Error":"unauthorized"}');

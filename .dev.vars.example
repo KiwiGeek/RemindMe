@@ -1,6 +1,20 @@
 # Copy to `.dev.vars` for local `wrangler dev`. Never commit `.dev.vars`.
+#
+# In production these all live in Cloudflare secrets (set via
+# `wrangler secret put <NAME>`). For local dev they're loaded from this
+# file as plaintext.
+
+# Real secrets (cryptographic material — generate fresh values).
 MAILGUN_API_KEY=key-replace-me
 MAILGUN_SIGNING_KEY=replace-me
 SESSION_SECRET=generate-with-openssl-rand-hex-32
 OTP_PEPPER=generate-with-openssl-rand-hex-32
 ACTION_TOKEN_SECRET=generate-with-openssl-rand-hex-32
+
+# Per-deployment config. Moved out of wrangler.toml so the repo can
+# stay generic. Override with your own values in `.dev.vars`.
+SITE_ORIGIN=http://localhost:8787
+MAILGUN_DOMAIN=example.com
+MAILGUN_FROM=Remind Me <reminders@example.com>
+MAILGUN_REPLY_TO=no-reply@example.com
+ADMIN_EMAILS=admin@example.com

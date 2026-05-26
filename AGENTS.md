@@ -8,10 +8,10 @@ Persistent guidance for AI agents (and humans) working in this repository.
 ## Project at a glance
 
 **Remind Me** — passwordless recurring-email reminder service hosted on
-Cloudflare Workers (free tier), delivering via Mailgun (US region), at
-`https://remindme.example.com`.
+Cloudflare Workers (free tier), delivering via Mailgun. The deployed
+site URL is operator-specific and lives in the `SITE_ORIGIN` secret.
 
-Owner: `example.com`. GitHub repo: `RemindMe` (private).
+GitHub repo: `RemindMe`.
 
 ## Architecture in one breath
 
@@ -153,8 +153,13 @@ npx wrangler d1 migrations create remindme <name>
 npx wrangler d1 migrations apply remindme --local
 npx wrangler d1 migrations apply remindme --remote
 
-# secrets (5 — MAILGUN_DOMAIN, ADMIN_EMAILS, APP_NAME, SITE_ORIGIN
-# live in [vars] in wrangler.toml, not as secrets)
+# secrets (only APP_NAME and MAILGUN_REGION live in [vars] in
+# wrangler.toml — everything else is a secret)
+npx wrangler secret put SITE_ORIGIN
+npx wrangler secret put MAILGUN_DOMAIN
+npx wrangler secret put MAILGUN_FROM
+npx wrangler secret put MAILGUN_REPLY_TO
+npx wrangler secret put ADMIN_EMAILS
 npx wrangler secret put MAILGUN_API_KEY
 npx wrangler secret put MAILGUN_SIGNING_KEY
 npx wrangler secret put SESSION_SECRET

@@ -4,17 +4,11 @@ compatibility_date = "2025-01-15"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-# Custom domain. Requires `example.com` to be an active zone on this
-# Cloudflare account (which it is). On `wrangler deploy`, Cloudflare:
-#   1. Creates a proxied DNS record for `remindme.example.com`.
-#   2. Issues a Universal SSL cert covering the hostname (first issuance
-#      can take 30s – a few minutes; until then browsers see a TLS error).
-#   3. Routes the hostname to this Worker.
-# Distinct from a `routes = […]` entry on an existing zone — `custom_domain`
-# handles the DNS + cert provisioning end-to-end.
-routes = [
-  { pattern = "remindme.example.com", custom_domain = true },
-]
+# Custom domain binding lives in the Cloudflare dashboard, not in this
+# file — set it under Workers & Pages → <worker> → Settings → Triggers
+# → Custom Domains. Keeping it out of `wrangler.toml` lets this repo
+# stay generic (no hostname leak) while the dashboard config persists
+# across deploys.
 
 # Static SPA assets are served from this directory. The SPA build step
 # (`npm run build:web`) populates it before deploys.
@@ -23,17 +17,12 @@ directory = "./web/dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-# Plaintext, non-secret runtime configuration.
+# Plaintext, non-secret runtime configuration. Anything that varies per
+# deployment (sending domain, from address, admin allow-list, public
+# site origin) lives in secrets instead — see the list below.
 [vars]
 APP_NAME = "Remind Me"
-SITE_ORIGIN = "https://remindme.example.com"
 MAILGUN_REGION = "us"
-MAILGUN_DOMAIN = "example.com"
-MAILGUN_FROM = "Remind Me <reminders@example.com>"
-MAILGUN_REPLY_TO = "no-reply@example.com"
-# Comma-separated; case-insensitive. Anyone signed in with one of these
-# addresses sees `/admin` in the SPA and can hit `/api/admin/*`.
-ADMIN_EMAILS = "admin@example.com,ops@example.com"
 
 # Secrets (set via `wrangler secret put <NAME>`):
 #   MAILGUN_API_KEY        - private Mailgun sending API key
@@ -41,6 +30,11 @@ ADMIN_EMAILS = "admin@example.com,ops@example.com"
 #   SESSION_SECRET         - HMAC key for session cookies
 #   OTP_PEPPER             - HMAC pepper for OTP code storage
 #   ACTION_TOKEN_SECRET    - HMAC key for email action URLs
+#   SITE_ORIGIN            - public URL of this deploy (used by CSRF + email links)
+#   MAILGUN_DOMAIN         - verified Mailgun sending domain
+#   MAILGUN_FROM           - "Display Name <addr@domain>" envelope for outgoing mail
+#   MAILGUN_REPLY_TO       - reply-to address (replies are discarded)
+#   ADMIN_EMAILS           - comma-separated, case-insensitive admin allow-list
 
 # D1 binding. The database is created with:
 #   npx wrangler d1 create remindme

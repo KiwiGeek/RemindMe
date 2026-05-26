@@ -1,7 +1,7 @@
 # Remind Me
 
 Passwordless recurring reminder email service. Runs on Cloudflare Workers (free
-tier) and delivers via Mailgun. Lives at <https://remindme.example.com>.
+tier) and delivers via Mailgun.
 
 See [`PLAN.md`](./PLAN.md) for the design and [`AGENTS.md`](./AGENTS.md) for
 contributor conventions.
@@ -14,10 +14,55 @@ Preact + Tailwind v4 · Biome · Vitest (Workers pool) · Mailgun.
 ## Prerequisites
 
 - Node 20+
-- A Cloudflare account (free tier is fine)
-- A Mailgun account with `example.com` (or your sending domain) verified
-- `wrangler` and `gh` available on PATH (installed as project devDependency for
-  Wrangler; `gh` for repo admin)
+- A Cloudflare account (free tier is fine). To use a custom domain you'll
+  need that domain set up as an active zone on the same account.
+- A Mailgun account with your sending domain verified — SPF, DKIM, and
+  the tracking CNAME records all green in the Mailgun dashboard.
+  Mailgun's free / "Foundation" tier is sufficient.
+- `wrangler` and `gh` available on PATH (`wrangler` is installed as a
+  project devDependency; `gh` is optional, only used for repo admin like
+  flipping visibility).
+
+## Forking this for your own deploy
+
+Anything operator-specific (your domain, your Mailgun account, your
+admin allow-list) lives outside the committed code. `wrangler.toml`
+only carries non-sensitive defaults; everything else is set via
+`wrangler secret put` for production and `.dev.vars` for local dev.
+
+Things to change before the first `wrangler deploy`:
+
+| File | Setting | What to change |
+| --- | --- | --- |
+| `wrangler.toml` | `name` | Your Worker name (DNS-safe). Defaults to `remindme`. |
+| `wrangler.toml` | `[vars] APP_NAME` | Whatever you want the SPA to call itself. |
+| `wrangler.toml` | `[vars] MAILGUN_REGION` | `us` or `eu` — must match your Mailgun account region. |
+| `wrangler.toml` | `[[d1_databases]] database_id` | The id `wrangler d1 create` returned for *your* D1. |
+| `wrangler.toml` | `[[kv_namespaces]] id` | The id `wrangler kv namespace create` returned for *your* KV. |
+| `web/src/buildInfo.ts` | `GITHUB_REPO` | `your-username/your-repo`, so the sign-in footer's commit link points at your fork. |
+
+These values are populated via `wrangler secret put` (see [First-time
+setup](#first-time-setup)) and `.dev.vars` for local dev — never
+checked into the repo:
+
+| Secret | Used for |
+| --- | --- |
+| `SITE_ORIGIN` | Public URL of the Worker (e.g. `https://your-domain`). Used in email links + CSRF checks. |
+| `MAILGUN_DOMAIN` | Your verified Mailgun sending domain. |
+| `MAILGUN_FROM` | Envelope sender, e.g. `Remind Me <reminders@your-domain>`. |
+| `MAILGUN_REPLY_TO` | Reply-to address (we discard replies). |
+| `ADMIN_EMAILS` | Comma-separated, case-insensitive admin allow-list. |
+| `MAILGUN_API_KEY` | Mailgun sending API key. |
+| `MAILGUN_SIGNING_KEY` | Mailgun HTTP webhook signing key. |
+| `SESSION_SECRET` | HMAC key for session cookies. |
+| `OTP_PEPPER` | Hash pepper for stored OTPs. |
+| `ACTION_TOKEN_SECRET` | HMAC key for one-click email action tokens. |
+
+For a custom domain, attach it to the Worker via the Cloudflare
+dashboard (**Workers & Pages → your-worker → Settings → Domains &
+Routes → Add custom domain**); the repo intentionally doesn't pin a
+domain in `wrangler.toml`. If you skip this step the Worker is still
+reachable at `<name>.<your-subdomain>.workers.dev`.
 
 ## First-time setup
 
@@ -37,6 +82,11 @@ npm run db:migrate:remote
 cp .dev.vars.example .dev.vars            # then edit values
 
 # Production secrets (one-off per environment).
+npx wrangler secret put SITE_ORIGIN
+npx wrangler secret put MAILGUN_DOMAIN
+npx wrangler secret put MAILGUN_FROM
+npx wrangler secret put MAILGUN_REPLY_TO
+npx wrangler secret put ADMIN_EMAILS
 npx wrangler secret put MAILGUN_API_KEY
 npx wrangler secret put MAILGUN_SIGNING_KEY
 npx wrangler secret put SESSION_SECRET
@@ -91,31 +141,32 @@ Implementation notes:
 
 ### Granting admin access
 
-The admin allow-list is the `ADMIN_EMAILS` var in `wrangler.toml` — a
+The admin allow-list is the `ADMIN_EMAILS` Cloudflare secret — a
 comma-separated, case-insensitive list of email addresses. There is no
-DB-stored admin flag on purpose: escalating to admin requires shipping a
-new Worker version, which in turn requires already controlling the
-deploy pipeline.
+DB-stored admin flag on purpose: escalating to admin requires
+re-setting that secret, which in turn requires already controlling the
+deploy account.
 
 To add or remove an admin:
 
-```toml
-[vars]
-ADMIN_EMAILS = "admin@example.com,ops@example.com"
+```bash
+npx wrangler secret put ADMIN_EMAILS
+# paste the new comma-separated list when prompted
 ```
 
-Then `npm run deploy`. Affected accounts pick up the new role on their
-next `GET /api/me`.
+Update `.dev.vars` to match locally. Affected accounts pick up the new
+role on their next `GET /api/me`.
 
 ### Mailgun webhook setup
 
 Bounce/complaint handling requires Mailgun to POST events to the Worker.
 Once deployed:
 
-1. Mailgun dashboard → **Sending → Webhooks** → pick the sending domain
-   (`example.com`).
+1. Mailgun dashboard → **Sending → Webhooks** → pick your sending
+   domain.
 2. For each of these events, set the URL to
-   `https://remindme.example.com/webhooks/mailgun`:
+   `<SITE_ORIGIN>/webhooks/mailgun` (e.g.
+   `https://your-domain/webhooks/mailgun`):
    - **Permanent Failure** (hard bounce → suspend)
    - **Temporary Failure** (soft bounce → audit-only)
    - **Spam Complaint** (suspend)
@@ -234,25 +285,26 @@ Run through this list before announcing the service. Everything is
 also covered in detail elsewhere in this README; this section is the
 short version to make sure nothing was missed.
 
-- **DNS**: `remindme.example.com` is a CNAME (or routes via Cloudflare
-  proxy) to the Worker. `wrangler.toml` declares the custom domain so
-  Cloudflare provisions DNS + SSL on first deploy. After `npm run
-  deploy`, hit `https://remindme.example.com/api/healthz` — should
-  return `200 {"ok":true}`.
-- **Mailgun sending domain**: `example.com` (apex) verified, tracking
-  records in place, "EU vs US" region matches `MAILGUN_REGION` in
-  `wrangler.toml`.
+- **DNS**: your custom domain is attached to the Worker in the
+  Cloudflare dashboard (**Workers & Pages → your-worker → Settings →
+  Domains & Routes**). Cloudflare provisions DNS + SSL automatically
+  for any zone on the same account. After `npm run deploy`, hit
+  `<SITE_ORIGIN>/api/healthz` — should return `200 {"ok":true}`.
+- **Mailgun sending domain** verified, tracking records in place,
+  "EU vs US" region matches `MAILGUN_REGION` in `wrangler.toml`.
 - **Secrets** present in production (set via `wrangler secret put`):
-  `MAILGUN_API_KEY`, `MAILGUN_SIGNING_KEY`, `SESSION_SECRET`,
-  `OTP_PEPPER`, `ACTION_TOKEN_SECRET`. The Worker logs a loud warning on
-  first request if any are still set to the `.dev.vars.example`
-  placeholder values.
-- **Mailgun webhooks** point at
-  `https://remindme.example.com/webhooks/mailgun` for **Permanent
-  Failure**, **Temporary Failure**, **Spam Complaint**, and
-  **Unsubscribes**. See [Mailgun webhook setup](#mailgun-webhook-setup).
-- **Admin emails** in `wrangler.toml`'s `ADMIN_EMAILS` reflect the real
-  operator list (it's a CSV, case-insensitive). Changes need a redeploy.
+  `SITE_ORIGIN`, `MAILGUN_DOMAIN`, `MAILGUN_FROM`, `MAILGUN_REPLY_TO`,
+  `ADMIN_EMAILS`, `MAILGUN_API_KEY`, `MAILGUN_SIGNING_KEY`,
+  `SESSION_SECRET`, `OTP_PEPPER`, `ACTION_TOKEN_SECRET`. The Worker
+  logs a loud warning on first request if any are still set to the
+  `.dev.vars.example` placeholder values.
+- **Mailgun webhooks** point at `<SITE_ORIGIN>/webhooks/mailgun` for
+  **Permanent Failure**, **Temporary Failure**, **Spam Complaint**,
+  and **Unsubscribes**. See [Mailgun webhook
+  setup](#mailgun-webhook-setup).
+- **Admin emails**: the `ADMIN_EMAILS` secret reflects the real
+  operator list (CSV, case-insensitive). Changes need a redeploy or a
+  fresh `wrangler secret put ADMIN_EMAILS`.
 - **Cron trigger**: `wrangler.toml` declares `*/5 * * * *`, which is
   Cloudflare's free-plan minimum. The scheduler looks 6 minutes ahead so
   emails arrive on time or slightly early, never late.

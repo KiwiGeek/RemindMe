@@ -7,11 +7,12 @@
 
 ## 1. Goal
 
-Build a passwordless, self-serve web app at `https://remindme.example.com` that
-sends recurring reminder emails on flexible schedules. Users sign in with their
-email + a one-time code, then create, edit, pause, and delete reminders. The
-system delivers via Mailgun and automatically suspends sending to addresses
-that bounce or complain.
+Build a passwordless, self-serve web app at the operator's `SITE_ORIGIN`
+(e.g. `https://your-domain`) that sends recurring reminder emails on
+flexible schedules. Users sign in with their email + a one-time code,
+then create, edit, pause, and delete reminders. The system delivers via
+Mailgun and automatically suspends sending to addresses that bounce or
+complain.
 
 Constraints:
 
@@ -22,14 +23,17 @@ Constraints:
 ## 2. Naming & Branding
 
 - **Product name:** *Remind Me*
-- **Repo name:** `RemindMe` (private GitHub repo)
-- **Site origin:** `https://remindme.example.com`
-- **Mailgun sending domain:** `example.com` (apex). Tracking CNAME is
-  `email.example.com` (already configured in Mailgun).
-- **From address:** `Remind Me <reminders@example.com>`
-- **Reply-to:** `no-reply@example.com` (replies discarded; we'll add an
-  auto-responder if you want one later).
-- **Mailgun API base:** `https://api.mailgun.net/v3/example.com`.
+- **Repo name:** `RemindMe`
+- **Site origin:** operator-specific, e.g. `https://your-domain`
+  (`SITE_ORIGIN` secret).
+- **Mailgun sending domain:** operator-specific (`MAILGUN_DOMAIN`
+  secret). Tracking CNAME wired up in Mailgun's dashboard.
+- **From address:** `Remind Me <reminders@your-mailgun-domain>`
+  (`MAILGUN_FROM` secret).
+- **Reply-to:** `no-reply@your-mailgun-domain` (`MAILGUN_REPLY_TO`
+  secret; replies discarded).
+- **Mailgun API base:** `https://api.mailgun.net/v3/<MAILGUN_DOMAIN>`
+  (or `api.eu.mailgun.net` when `MAILGUN_REGION=eu`).
 
 ## 3. Cloudflare Free-Tier Building Blocks
 
@@ -278,7 +282,7 @@ Optional, additive. Email OTP remains the always-on baseline.
 | Library | `@simplewebauthn/server` v13 + `/browser` v13 |
 | RP ID | Derived per-request from `Origin` header (host of the page) |
 | Expected origin | The `Origin` header verbatim |
-| Multi-env | Same code serves `localhost` and `remindme.example.com` |
+| Multi-env | Same code serves `localhost` and the deployed origin |
 | Discoverable creds | Yes — auth flow never asks for email; browser picks |
 | Challenge storage | KV, 5-minute TTL, key `pk:reg:{userId}` / `pk:auth:{challenge}` |
 | Per-user cap | 10 passkeys |
@@ -413,12 +417,16 @@ WCAG AA contrast.
   `/__scheduled`, which our `npm run dev` already passes).
 - D1 migrations in `migrations/` applied with `wrangler d1 migrations apply`.
   `npm run dev` auto-applies them to the local D1 first.
-- Secrets via `wrangler secret put` (5):
-  `MAILGUN_API_KEY`, `MAILGUN_SIGNING_KEY`, `SESSION_SECRET`, `OTP_PEPPER`,
-  `ACTION_TOKEN_SECRET`. `MAILGUN_DOMAIN`, `ADMIN_EMAILS`, `APP_NAME`,
-  and `SITE_ORIGIN` live in `[vars]` in `wrangler.toml`.
-- One `wrangler.toml`; production binds the `remindme.example.com` custom
-  domain. No separate `staging` env yet — add one if/when needed.
+- Secrets via `wrangler secret put`:
+  `SITE_ORIGIN`, `MAILGUN_DOMAIN`, `MAILGUN_FROM`, `MAILGUN_REPLY_TO`,
+  `ADMIN_EMAILS`, `MAILGUN_API_KEY`, `MAILGUN_SIGNING_KEY`,
+  `SESSION_SECRET`, `OTP_PEPPER`, `ACTION_TOKEN_SECRET`. Only
+  non-sensitive `APP_NAME` and `MAILGUN_REGION` live in `[vars]` in
+  `wrangler.toml`.
+- One `wrangler.toml`; the custom domain (if any) is attached to the
+  Worker via the Cloudflare dashboard so the repo stays
+  operator-agnostic. No separate `staging` env yet — add one if/when
+  needed.
 - GitHub Actions CI (`.github/workflows/ci.yml`) runs lint + typecheck +
   tests + build on push to `main` and on every PR. Pushes to `main` also
   trigger auto-deploy in a second job gated on the check job being
@@ -443,8 +451,8 @@ WCAG AA contrast.
 
 1. ~~**M0 — Scaffold.**~~ ✅ Wrangler project, Hono router, D1 binding,
    Drizzle migrations, `wrangler.toml`, Vite + Preact frontend skeleton,
-   Biome, Vitest, `/api/healthz` route. Smoke-deployed to
-   `remindme.workers.dev`.
+   Biome, Vitest, `/api/healthz` route. Smoke-deployed to the default
+   `*.workers.dev` subdomain.
 2. ~~**M1 — Auth.**~~ ✅ Email + OTP via Mailgun, KV-stored hashed codes
    with attempt + per-email/IP rate limits, HMAC-signed rolling session
    cookie, `/api/me` GET+PATCH, first-sign-in timezone confirmation banner,
@@ -463,7 +471,7 @@ WCAG AA contrast.
    idempotency via `reminder_fires(reminder_id, fire_at)` unique lock
    (raw `INSERT … ON CONFLICT DO UPDATE … WHERE status IN
    ('queued','failed')`) plus a deterministic `Message-Id`
-   (`<reminder-{id}-{fire_at}@example.com>`) for receiver-side dedup.
+   (`<reminder-{id}-{fire_at}@{MAILGUN_DOMAIN}>`) for receiver-side dedup.
    `runScheduledTick()` joins users, skips suspended owners,
    defensively skips entries already in `suppressions`, decrements
    `remaining_count`, marks completed when exhausted, and retries
@@ -500,7 +508,7 @@ WCAG AA contrast.
    OTP (never replaces it — deleting your last passkey can't lock you
    out). `@simplewebauthn/server` v13 + `/browser` v13 power the
    ceremonies. RP ID and expected origin are derived per-request from
-   the `Origin` header so `localhost` (dev) and `remindme.example.com`
+   the `Origin` header so `localhost` (dev) and the deployed host
    (prod) work from the same code with no env toggling. Authentication
    uses **discoverable credentials** — no email entered, the browser
    picks a passkey, the server resolves the user via `credential_id` —
@@ -553,8 +561,9 @@ WCAG AA contrast.
 
 ## 14. Resolved Decisions Log
 
-- Mailgun sending domain = `example.com` (apex). Tracking CNAME
-  `email.example.com` already in place.
+- Mailgun sending domain is the operator's verified apex (or
+  subdomain) — set via the `MAILGUN_DOMAIN` secret. Tracking CNAME
+  configured in the Mailgun dashboard.
 - OTP-vs-suppression: when a user-initiated action requires sending to a
   currently-suppressed address (recovery OTP, login retry post-bounce),
   pre-call Mailgun `DELETE /v3/<domain>/bounces/<address>` (and the
@@ -564,7 +573,7 @@ WCAG AA contrast.
 - Retention: trim `reminder_fires` and `audit_log` rows older than 30 days
   via the cron handler.
 - Sender display name: always `Remind Me`.
-- GitHub repo: `KiwiGeek/RemindMe`, private.
+- GitHub repo: `KiwiGeek/RemindMe`.
 
 ## 15. Open Questions
 

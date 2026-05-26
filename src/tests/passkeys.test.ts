@@ -28,7 +28,7 @@ async function signIn(email: string): Promise<{ cookie: string; userId: number }
   for (let i = 0; i < 3; i++) {
     pool
       .intercept({
-        path: /^\/v3\/penman\.dev\/(bounces|unsubscribes|complaints)\//,
+        path: /^\/v3\/example\.com\/(bounces|unsubscribes|complaints)\//,
         method: 'DELETE',
       })
       .reply(404, '{}');

@@ -66,12 +66,13 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     # Optional GitHub Environment so the deploy shows up in the repo's
-    # "Environments" sidebar with history + URL. If you ever want manual
-    # approval gates, add a required reviewer to this environment in the
-    # repo settings — no workflow change required.
+    # "Environments" sidebar with history. If you ever want manual
+    # approval gates, add a required reviewer to this environment in
+    # the repo settings — no workflow change required. (Set the URL in
+    # the GitHub Environment settings if you want the sidebar to link
+    # to your deployed site.)
     environment:
       name: production
-      url: https://remindme.example.com
 
     steps:
       - uses: actions/checkout@v4

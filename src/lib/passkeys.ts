@@ -6,8 +6,8 @@
  *   1. **RP ID and expected origin are derived per-request** from the `Origin`
  *      header instead of being baked into env vars. That keeps local
  *      development (`http://localhost:5173`, RP ID `localhost`) and production
- *      (`https://remindme.example.com`, RP ID `remindme.example.com`) working
- *      from the same code without a special-case toggle. The browser will
+ *      (`https://your-domain`, RP ID matching the same host) working from the
+ *      same code without a special-case toggle. The browser will
  *      anyway refuse the ceremony unless the page's origin matches the
  *      registered RP ID, so a hostile origin can't trick the server into
  *      issuing a useful credential.

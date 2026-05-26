@@ -8,7 +8,7 @@
  * Per-fire idempotency uses `reminder_fires(reminder_id, fire_at)` as a
  * unique lock. We INSERT-ON-CONFLICT to claim a fire; if another concurrent
  * tick already marked it `sent`, our upsert is a no-op and we move on. A
- * stable Mailgun `Message-Id` (`<reminder-{id}-{fire_at}@example.com>`) gives
+ * stable Mailgun `Message-Id` (`<reminder-{id}-{fire_at}@{MAILGUN_DOMAIN}>`) gives
  * recipients something to dedupe on if the row-lock ever loses a race.
  *
  * Failed sends keep the row at `status='failed'`; the next tick re-attempts
