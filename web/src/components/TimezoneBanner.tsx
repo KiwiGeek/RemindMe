@@ -82,7 +82,7 @@ export function TimezoneBanner({ user, onConfirmed }: Props) {
             Cancel
           </button>
           <p class="basis-full text-xs text-amber-800 dark:text-amber-300">
-            You can change this anytime in your profile (coming soon).
+            You can change this anytime under Settings.
           </p>
         </div>
       )}

@@ -70,6 +70,12 @@ export function App() {
     return (
       <Settings
         user={state.user}
+        onUserChanged={(user) =>
+          setState({
+            ...state,
+            user,
+          })
+        }
         onExit={() => setState({ ...state, view: 'dashboard' })}
         onLoggedOut={() => setState({ kind: 'signed_out' })}
       />
