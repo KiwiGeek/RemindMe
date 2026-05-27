@@ -9,7 +9,7 @@ html {
   user-select: none;
 }
 
-:where(input, textarea, select, [contenteditable='true']) {
+:where(input, textarea, select, [contenteditable="true"]) {
   -webkit-user-select: text;
   user-select: text;
 }
