@@ -3,15 +3,124 @@
 /*
  * Reduce accidental marquee selection on UI chrome while keeping inputs
  * and text areas selectable for editing and paste.
+ *
+ * Scrollbar: native auto overflow (small layout shift when it appears).
+ * Track is transparent; thumb is styled and only shows when scrollable.
  */
 html {
   -webkit-user-select: none;
   user-select: none;
+  min-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(113 113 122 / 0.45) transparent;
+  background-color: #b9cbe3;
+  background-image: linear-gradient(
+    165deg,
+    #ffffff 0%,
+    #edf0f9 26%,
+    #d9e3f4 52%,
+    #c6d5ea 82%,
+    #b9cbe3 100%
+  );
+  background-attachment: fixed;
+}
+
+html::-webkit-scrollbar {
+  width: 8px;
+  background: transparent;
+}
+
+html::-webkit-scrollbar-track,
+html::-webkit-scrollbar-track-piece,
+html::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+  background-color: rgb(113 113 122 / 0.4);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+html:hover::-webkit-scrollbar-thumb {
+  background-color: rgb(113 113 122 / 0.62);
+}
+
+html::-webkit-scrollbar-thumb:active {
+  background-color: rgb(113 113 122 / 0.75);
+}
+
+html.dark {
+  scrollbar-color: rgb(161 161 170 / 0.42) transparent;
+  background-color: #020203;
+  background-image: linear-gradient(
+    166deg,
+    #2c2c36 0%,
+    #1a1a22 32%,
+    #111116 62%,
+    #080809 85%,
+    #020203 100%
+  );
+}
+
+html::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  box-shadow: inset 0 0 min(200px, 28vw) rgb(63 63 70 / 0.16);
+}
+
+html.dark::after {
+  box-shadow: inset 0 0 min(220px, 32vw) rgb(0 0 0 / 0.72);
+}
+
+html.dark::-webkit-scrollbar-thumb {
+  background-color: rgb(161 161 170 / 0.38);
+}
+
+html.dark:hover::-webkit-scrollbar-thumb {
+  background-color: rgb(161 161 170 / 0.58);
+}
+
+html.dark::-webkit-scrollbar-thumb:active {
+  background-color: rgb(161 161 170 / 0.72);
 }
 
 :where(input, textarea, select, [contenteditable="true"]) {
   -webkit-user-select: text;
   user-select: text;
+}
+
+body {
+  min-height: 100vh;
+  background: transparent;
+}
+
+/* Shared surfaces + controls — keeps layouts minimal but a bit warmer. */
+@layer components {
+  .ui-header {
+    @apply flex flex-col gap-4 rounded-2xl border border-zinc-200/80 bg-white/90 px-4 py-4 shadow-md shadow-zinc-950/5 backdrop-blur-sm sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:py-5 dark:border-zinc-800/85 dark:bg-zinc-950/75 dark:shadow-black/40;
+  }
+
+  .ui-card {
+    @apply rounded-2xl border border-zinc-200/80 bg-white/95 p-5 shadow-md shadow-zinc-950/5 sm:p-6 dark:border-zinc-800/85 dark:bg-zinc-950/90 dark:shadow-black/35;
+  }
+
+  .ui-btn-primary {
+    @apply inline-flex cursor-pointer items-center justify-center rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white shadow-md shadow-zinc-950/20 transition hover:bg-zinc-800 active:brightness-95 disabled:pointer-events-none disabled:opacity-45 dark:bg-zinc-100 dark:font-semibold dark:text-zinc-950 dark:shadow-none dark:hover:bg-white;
+  }
+
+  .ui-btn-secondary {
+    @apply inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200/90 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 active:brightness-95 disabled:pointer-events-none disabled:opacity-45 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:bg-zinc-800;
+  }
+
+  .ui-btn-secondary-sm {
+    @apply inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200/90 bg-white px-2 py-1 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 active:brightness-95 disabled:pointer-events-none disabled:opacity-45 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:bg-zinc-800;
+  }
 }
 
 /* Class-based dark mode: Tailwind v4 defaults to a `prefers-color-scheme`

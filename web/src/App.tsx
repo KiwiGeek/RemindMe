@@ -42,9 +42,10 @@ export function App() {
       <main
         aria-busy="true"
         aria-live="polite"
-        class="flex min-h-screen items-center justify-center text-zinc-500"
+        class="flex min-h-screen flex-col items-center justify-center gap-3 text-zinc-500 dark:text-zinc-400"
       >
-        Loading…
+        <span class="inline-block size-6 animate-pulse rounded-full bg-zinc-300/80 dark:bg-zinc-700" />
+        <span class="text-sm font-medium tracking-tight">Loading…</span>
       </main>
     );
   }

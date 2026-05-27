@@ -92,10 +92,10 @@ export function PasskeysSection() {
   }
 
   return (
-    <section class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div class="flex items-center justify-between">
+    <section class="ui-card">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 class="text-lg font-medium">Passkeys</h2>
+          <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Passkeys</h2>
           <p class="mt-1 text-xs text-zinc-500">
             Optional. Email sign-in keeps working even if you remove all passkeys.
           </p>
@@ -105,7 +105,7 @@ export function PasskeysSection() {
             type="button"
             disabled={busy}
             onClick={() => void addPasskey()}
-            class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+            class="ui-btn-primary w-full shrink-0 sm:w-auto disabled:pointer-events-none"
           >
             + Add a passkey
           </button>
@@ -127,7 +127,7 @@ export function PasskeysSection() {
       {error && (
         <p
           role="alert"
-          class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
+          class="mt-4 rounded-xl border border-red-200/90 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900/70 dark:bg-red-950/70 dark:text-red-200"
         >
           {error}
         </p>
@@ -152,7 +152,7 @@ export function PasskeysSection() {
                   type="button"
                   disabled={busy}
                   onClick={() => void rename(p)}
-                  class="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                  class="ui-btn-secondary-sm"
                 >
                   Rename
                 </button>
@@ -160,7 +160,7 @@ export function PasskeysSection() {
                   type="button"
                   disabled={busy}
                   onClick={() => void remove(p)}
-                  class="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950"
+                  class="inline-flex items-center justify-center rounded-lg border border-red-400/35 bg-white px-2 py-1 text-xs font-medium text-red-700 shadow-sm transition hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:bg-transparent dark:text-red-300 dark:hover:bg-red-950/50"
                 >
                   Remove
                 </button>
@@ -171,7 +171,7 @@ export function PasskeysSection() {
       )}
 
       {supported && passkeys !== null && passkeys.length === 0 && (
-        <p class="mt-4 rounded-lg border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700">
+        <p class="mt-4 rounded-xl border border-dashed border-zinc-300/90 bg-zinc-50/50 p-4 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/30 dark:text-zinc-400">
           No passkeys yet. Add one to sign in with Touch ID, Windows Hello, or your password
           manager.
         </p>

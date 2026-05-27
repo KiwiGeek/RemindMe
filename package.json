@@ -7,7 +7,7 @@
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "dev": "concurrently -n worker,web -c blue,green \"npm:dev:worker\" \"npm:dev:web\"",
-    "dev:worker": "wrangler d1 migrations apply remindme --local && wrangler dev --test-scheduled",
+    "dev:worker": "node scripts/ensure-web-dist.mjs && wrangler d1 migrations apply remindme --local && wrangler dev --test-scheduled",
     "dev:web": "vite --config web/vite.config.ts",
     "build": "npm run build:web && npm run build:worker",
     "build:web": "vite build --config web/vite.config.ts",

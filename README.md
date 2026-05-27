@@ -120,6 +120,14 @@ migration step is a no-op when there's nothing to apply.
 In dev, the Vite server proxies `/api/*` and `/r/*` to the Worker so the SPA
 talks to the same origin as in production.
 
+If the browser shows **`ECONNREFUSED 127.0.0.1:8787`** in the Vite terminal,
+the Worker never bound its port — scroll the **`[worker]`** log in the same
+terminal: Wrangler exits when `web/dist` is missing. `npm run dev` runs
+`scripts/ensure-web-dist.mjs` before `wrangler dev` to create that directory;
+if you start Vite alone (`npm run dev:web`), start **`npm run dev:worker`** in
+another terminal as well, or run `npm run build:web` once so `web/dist`
+exists after a clean clone.
+
 ### Passkeys
 
 Passkeys are optional. To opt in:

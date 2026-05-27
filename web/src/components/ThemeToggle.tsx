@@ -33,7 +33,7 @@ export function ThemeToggle({ controller }: Props) {
       onClick={cycle}
       title={label}
       aria-label={label}
-      class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+      class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-zinc-200/90 bg-white text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
     >
       {pref === 'light' ? <SunIcon /> : pref === 'dark' ? <MoonIcon /> : <SystemIcon />}
       <span class="sr-only">Cycle to {next} theme</span>

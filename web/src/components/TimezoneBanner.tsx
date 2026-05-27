@@ -23,8 +23,8 @@ export function TimezoneBanner({ user, onConfirmed }: Props) {
   }
 
   return (
-    <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900 dark:bg-amber-950">
-      <p class="mb-2 font-medium text-amber-900 dark:text-amber-100">Confirm your timezone</p>
+    <div class="rounded-2xl border border-amber-300/55 bg-gradient-to-br from-amber-50 to-amber-100/40 p-5 text-sm shadow-md shadow-amber-900/10 dark:border-amber-800/80 dark:from-amber-950 dark:to-amber-950/40 dark:shadow-black/30">
+      <p class="mb-2 font-semibold text-amber-950 dark:text-amber-100">Confirm your timezone</p>
       {!editing ? (
         <div class="flex flex-wrap items-center gap-3">
           <span class="text-amber-900 dark:text-amber-100">
