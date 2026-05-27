@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+/*
+ * Reduce accidental marquee selection on UI chrome while keeping inputs
+ * and text areas selectable for editing and paste.
+ */
+html {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+:where(input, textarea, select, [contenteditable='true']) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Class-based dark mode: Tailwind v4 defaults to a `prefers-color-scheme`
  * media query, which we can't override. Switching the `dark:` variant to
  * match `.dark` (or any descendant of it) lets us drive the theme from
