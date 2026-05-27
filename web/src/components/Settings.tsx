@@ -41,8 +41,7 @@ export function Settings({ user, onUserChanged, onExit, onLoggedOut }: Props) {
   }, [user.timezone]);
 
   const normalizedTz = timezoneInput.trim();
-  const tzDirty =
-    normalizedTz !== user.timezone || !user.tzConfirmed;
+  const tzDirty = normalizedTz !== user.timezone || !user.tzConfirmed;
 
   async function saveTimezone() {
     if (!normalizedTz) return;
@@ -108,11 +107,15 @@ export function Settings({ user, onUserChanged, onExit, onLoggedOut }: Props) {
         class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
         aria-labelledby="settings-timezone-heading"
       >
-        <h2 id="settings-timezone-heading" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2
+          id="settings-timezone-heading"
+          class="text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+        >
           Timezone
         </h2>
         <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-          New reminders default to this IANA timezone. Existing reminders keep their own timezone until you edit them.
+          New reminders default to this IANA timezone. Existing reminders keep their own timezone
+          until you edit them.
         </p>
         <div class="mt-4 flex flex-wrap items-center gap-2">
           <input
