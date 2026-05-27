@@ -21,7 +21,8 @@
     "format": "biome format --write .",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply remindme --local",
-    "db:migrate:remote": "wrangler d1 migrations apply remindme --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply remindme --remote",
+    "prepare": "husky"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.8.0",
@@ -46,6 +47,8 @@
     "@types/node": "^20.19.41",
     "concurrently": "^9.1.0",
     "drizzle-kit": "^0.31.10",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
     "preact": "^10.25.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
@@ -55,6 +58,11 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "lint-staged": {
+    "*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc,css,md,yml,yaml}": [
+      "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
+    ]
   },
   "overrides": {
     "@esbuild-kit/core-utils": {

@@ -4,9 +4,11 @@ import {
   SNOOZE_DURATIONS,
   signFireAction,
   signMagicLink,
+  signOtpLoginLink,
   snoozeDurationSeconds,
   verifyFireAction,
   verifyMagicLink,
+  verifyOtpLoginLink,
 } from '~/lib/actionToken';
 
 const SECRET = 'unit-test-action-secret-do-not-deploy';
@@ -54,6 +56,11 @@ describe('signFireAction / verifyFireAction', () => {
     const magic = await signMagicLink(SECRET, 99);
     expect(await verifyFireAction(SECRET, magic)).toBeNull();
   });
+
+  it('refuses to decode an otp login link as a fire action', async () => {
+    const link = await signOtpLoginLink(SECRET, 'a@example.com', 'abc123');
+    expect(await verifyFireAction(SECRET, link)).toBeNull();
+  });
 });
 
 describe('signMagicLink / verifyMagicLink', () => {
@@ -74,6 +81,31 @@ describe('signMagicLink / verifyMagicLink', () => {
     const token = await signMagicLink(SECRET, 1, { ttlSec: 5, nowSec });
     expect(await verifyMagicLink(SECRET, token, nowSec + 4)).not.toBeNull();
     expect(await verifyMagicLink(SECRET, token, nowSec + 10)).toBeNull();
+  });
+
+  it("won't decode an otp login link as a magic link", async () => {
+    const link = await signOtpLoginLink(SECRET, 'a@example.com', 'jti');
+    expect(await verifyMagicLink(SECRET, link)).toBeNull();
+  });
+});
+
+describe('signOtpLoginLink / verifyOtpLoginLink', () => {
+  it('round-trips', async () => {
+    const token = await signOtpLoginLink(SECRET, 'alice@example.com', 'deadbeef');
+    const decoded = await verifyOtpLoginLink(SECRET, token);
+    expect(decoded?.email).toBe('alice@example.com');
+    expect(decoded?.jti).toBe('deadbeef');
+    expect(decoded?.k).toBe('ol');
+  });
+
+  it('honours expiry', async () => {
+    const nowSec = 1_000_000_000;
+    const token = await signOtpLoginLink(SECRET, 'a@example.com', 'jti', {
+      ttlSec: 600,
+      nowSec,
+    });
+    expect(await verifyOtpLoginLink(SECRET, token, nowSec + 599)).not.toBeNull();
+    expect(await verifyOtpLoginLink(SECRET, token, nowSec + 601)).toBeNull();
   });
 });
 

@@ -27,12 +27,15 @@ import type { AppBindings } from '~/env';
 import {
   type FireActionPayload,
   type SnoozeDuration,
+  otpLoginLinkKvKey,
   snoozeDurationSeconds,
   verifyFireAction,
   verifyMagicLink,
+  verifyOtpLoginLink,
 } from '~/lib/actionToken';
 import { nextFires } from '~/lib/recurrence';
 import { signSession, writeSessionCookie } from '~/lib/session';
+import { signInAfterEmailProof } from '~/lib/signIn';
 
 type Ctx = Context<AppBindings>;
 
@@ -41,7 +44,32 @@ export const r = new Hono<AppBindings>()
   .post('/:token', (c) => handle(c, c.req.param('token'), 'POST'));
 
 async function handle(c: Ctx, token: string, method: 'GET' | 'POST') {
-  // Try magic-link first; it's user-scoped and never burns a fire row.
+  const otpLink = await verifyOtpLoginLink(c.env.ACTION_TOKEN_SECRET, token);
+  if (otpLink) {
+    const kvKey = otpLoginLinkKvKey(otpLink.jti);
+    const storedEmail = await c.env.KV.get(kvKey);
+    if (!storedEmail || storedEmail !== otpLink.email) {
+      return c.html(
+        page(
+          'Link expired',
+          'This sign-in link is no longer valid. Request a fresh code from the home page.',
+        ),
+        410,
+      );
+    }
+    await c.env.KV.delete(kvKey);
+
+    const user = await signInAfterEmailProof(c.env, c, otpLink.email);
+    if (!user) {
+      return c.html(
+        page('Sign-in failed', 'Something went wrong. Try again from the home page.'),
+        500,
+      );
+    }
+    return c.redirect('/', 302);
+  }
+
+  // Magic-link sign-in for existing users (e.g. reminder footer).
   const magic = await verifyMagicLink(c.env.ACTION_TOKEN_SECRET, token);
   if (magic) {
     const db = getDb(c.env);

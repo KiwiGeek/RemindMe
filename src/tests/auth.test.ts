@@ -46,6 +46,12 @@ function extractCode(body: string | null): string {
   return m[1] as string;
 }
 
+function extractOtpLoginPath(body: string | null): string {
+  const m = body?.match(/\/r\/(ol\.[^\s"'<>]+)/);
+  if (!m) throw new Error(`no otp login link in body: ${body?.slice(0, 400)}`);
+  return `/r/${m[1]}`;
+}
+
 async function postJson(path: string, body: unknown) {
   return SELF.fetch(`https://example.com${path}`, {
     method: 'POST',
@@ -58,6 +64,8 @@ beforeEach(async () => {
   await env.DB.prepare('DELETE FROM users').run();
   const otps = await env.KV.list({ prefix: 'otp:' });
   await Promise.all(otps.keys.map((k) => env.KV.delete(k.name)));
+  const links = await env.KV.list({ prefix: 'ol:' });
+  await Promise.all(links.keys.map((k) => env.KV.delete(k.name)));
   const rls = await env.KV.list({ prefix: 'rl:' });
   await Promise.all(rls.keys.map((k) => env.KV.delete(k.name)));
 });
@@ -70,7 +78,9 @@ describe('POST /api/auth/request', () => {
     expect(await res.text()).toBe('');
     expect(capturedBody.value).toMatch(/alice@example\.com/);
     expect(capturedBody.value).toMatch(/sign-in code/i);
+    expect(capturedBody.value).toMatch(/Sign in directly|sign in directly/i);
     expect(extractCode(capturedBody.value)).toMatch(/^\d{6}$/);
+    expect(extractOtpLoginPath(capturedBody.value)).toMatch(/^\/r\/ol\./);
   });
 
   it('stores a hashed code in KV', async () => {

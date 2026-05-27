@@ -11,6 +11,8 @@
  *                         user. Used by the "Manage your reminders" footer
  *                         link so recipients don't need to do an OTP loop
  *                         just to unsubscribe.
+ *   - `ol.<body>.<sig>`  OTP login link — email-scoped, short TTL, single-use
+ *                         via KV. Included in OTP emails alongside the code.
  *
  * Signature is HMAC-SHA256 over the base64url-encoded JSON payload, signed
  * with `ACTION_TOKEN_SECRET`. The prefix is part of the HMAC input so a
@@ -68,8 +70,20 @@ export interface MagicLinkPayload {
   exp: number;
 }
 
+export interface OtpLoginLinkPayload {
+  k: 'ol';
+  email: string;
+  jti: string;
+  exp: number;
+}
+
 const FIRE_PREFIX = 'fa';
 const MAGIC_PREFIX = 'ml';
+const OTP_LINK_PREFIX = 'ol';
+
+export function otpLoginLinkKvKey(jti: string): string {
+  return `ol:${jti}`;
+}
 
 export async function signFireAction(
   secret: string,
@@ -115,6 +129,30 @@ export async function verifyMagicLink(
   nowSec: number = Math.floor(Date.now() / 1000),
 ): Promise<MagicLinkPayload | null> {
   return verifyWithPrefix<MagicLinkPayload>(secret, MAGIC_PREFIX, 'ml', token, nowSec);
+}
+
+export async function signOtpLoginLink(
+  secret: string,
+  email: string,
+  jti: string,
+  opts: { ttlSec?: number; nowSec?: number } = {},
+): Promise<string> {
+  const nowSec = opts.nowSec ?? Math.floor(Date.now() / 1000);
+  const payload: OtpLoginLinkPayload = {
+    k: 'ol',
+    email,
+    jti,
+    exp: nowSec + (opts.ttlSec ?? ACTION_TOKEN_TTL_SEC),
+  };
+  return signWithPrefix(secret, OTP_LINK_PREFIX, payload);
+}
+
+export async function verifyOtpLoginLink(
+  secret: string,
+  token: string,
+  nowSec: number = Math.floor(Date.now() / 1000),
+): Promise<OtpLoginLinkPayload | null> {
+  return verifyWithPrefix<OtpLoginLinkPayload>(secret, OTP_LINK_PREFIX, 'ol', token, nowSec);
 }
 
 async function signWithPrefix(

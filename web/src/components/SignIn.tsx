@@ -114,7 +114,10 @@ export function SignIn({ onSignedIn }: Props) {
                   </>
                 )}
                 <form onSubmit={submitEmail} class="space-y-3">
-                  <label class="block text-sm font-semibold text-zinc-700 dark:text-zinc-300" for="email-input">
+                  <label
+                    class="block text-sm font-semibold text-zinc-700 dark:text-zinc-300"
+                    for="email-input"
+                  >
                     Email
                   </label>
                   <input
@@ -127,7 +130,11 @@ export function SignIn({ onSignedIn }: Props) {
                     class="w-full rounded-xl border border-zinc-300/90 bg-white px-3 py-2.5 text-base shadow-inner shadow-zinc-900/5 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-400/40 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:border-zinc-400 dark:focus:ring-zinc-600/35"
                     placeholder="you@example.com"
                   />
-                  <button type="submit" disabled={busy || !email} class="ui-btn-primary w-full py-2.5 disabled:pointer-events-none">
+                  <button
+                    type="submit"
+                    disabled={busy || !email}
+                    class="ui-btn-primary w-full py-2.5 disabled:pointer-events-none"
+                  >
                     {busy ? 'Sending…' : 'Send me a code'}
                   </button>
                 </form>
@@ -137,10 +144,14 @@ export function SignIn({ onSignedIn }: Props) {
             {stage === 'code' && (
               <form onSubmit={submitCode} class="space-y-3">
                 <p class="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-                  We sent a 6-digit code to <span class="font-semibold text-zinc-800 dark:text-zinc-200">{email}</span>.
-                  Check your inbox (and spam folder).
+                  We sent a 6-digit code to{' '}
+                  <span class="font-semibold text-zinc-800 dark:text-zinc-200">{email}</span>. Check
+                  your inbox (and spam folder).
                 </p>
-                <label class="block text-sm font-semibold text-zinc-700 dark:text-zinc-300" for="code-input">
+                <label
+                  class="block text-sm font-semibold text-zinc-700 dark:text-zinc-300"
+                  for="code-input"
+                >
                   Code
                 </label>
                 <input

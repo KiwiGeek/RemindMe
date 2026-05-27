@@ -1,16 +1,14 @@
 import { zValidator } from '@hono/zod-validator';
-import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { getDb } from '~/db/client';
-import { users } from '~/db/schema';
 import type { AppBindings } from '~/env';
-import { hashOtp, randomNumericCode } from '~/lib/crypto';
+import { otpLoginLinkKvKey, signOtpLoginLink } from '~/lib/actionToken';
+import { hashOtp, randomHex, randomNumericCode } from '~/lib/crypto';
 import { renderOtpEmail } from '~/lib/emails/otp';
 import { MailgunClient } from '~/lib/mailgun';
 import { rateLimit } from '~/lib/ratelimit';
-import { clearSessionCookie, signSession, writeSessionCookie } from '~/lib/session';
-import { clearSuppressionForEmail } from '~/lib/suppression';
+import { clearSessionCookie } from '~/lib/session';
+import { signInAfterEmailProof } from '~/lib/signIn';
 import { presentUser } from '~/routes/me';
 
 const OTP_TTL_SECONDS = 10 * 60;
@@ -93,10 +91,20 @@ export const auth = new Hono<AppBindings>()
     }
 
     try {
+      const jti = randomHex(16);
+      const loginToken = await signOtpLoginLink(c.env.ACTION_TOKEN_SECRET, email, jti, {
+        ttlSec: OTP_TTL_SECONDS,
+      });
+      await c.env.KV.put(otpLoginLinkKvKey(jti), email, {
+        expirationTtl: OTP_TTL_SECONDS,
+      });
+
+      const signInUrl = new URL(`/r/${loginToken}`, c.env.SITE_ORIGIN).href;
       const { subject, text, html } = renderOtpEmail({
         appName: c.env.APP_NAME,
         code,
         expiresInMinutes: Math.floor(OTP_TTL_SECONDS / 60),
+        signInUrl,
       });
       await mg.send({
         to: email,
@@ -144,33 +152,10 @@ export const auth = new Hono<AppBindings>()
 
     await c.env.KV.delete(otpKey(email));
 
-    const db = getDb(c.env);
-    const existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    let user = existing[0];
-    if (!user) {
-      const inserted = await db.insert(users).values({ email }).returning();
-      user = inserted[0];
-    } else if (user.status === 'suspended') {
-      // Bounce-recovery path: user just proved they own the inbox. Reactivate
-      // the account and clear our local suppression row so the scheduler
-      // stops skipping their sends. Per-reminder reactivation stays opt-in —
-      // each suspended reminder needs an explicit "Reactivate" click in the
-      // dashboard so a once-bouncing address can't auto-resume a flood.
-      await db.update(users).set({ status: 'active' }).where(eq(users.id, user.id));
-      user = { ...user, status: 'active' };
-    }
-
+    const user = await signInAfterEmailProof(c.env, c, email);
     if (!user) {
       return c.json({ error: 'internal' }, 500);
     }
-
-    // Always clear local suppression on successful verify — the OTP send
-    // itself only works if Mailgun accepts the address, so by this point we
-    // *know* the inbox is reachable.
-    await clearSuppressionForEmail(c.env, email);
-
-    const token = await signSession(c.env.SESSION_SECRET, user.id);
-    writeSessionCookie(c, token);
 
     return c.json({ user: presentUser(c.env, user) });
   })

@@ -78,17 +78,17 @@ export function RemindersList({
         </p>
         <p class="mt-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">No reminders yet</p>
         <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          Use <span class="font-semibold text-zinc-600 dark:text-zinc-300">New reminder</span> above to
-          set up your first schedule.
+          Use <span class="font-semibold text-zinc-600 dark:text-zinc-300">New reminder</span> above
+          to set up your first schedule.
         </p>
       </div>
     );
   }
 
   return (
-      <div class="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-md shadow-zinc-950/5 dark:border-zinc-800/90 dark:bg-zinc-950/90 dark:shadow-black/40">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-zinc-50/95 text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-900/95 dark:text-zinc-400">
+    <div class="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-md shadow-zinc-950/5 dark:border-zinc-800/90 dark:bg-zinc-950/90 dark:shadow-black/40">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-zinc-50/95 text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-900/95 dark:text-zinc-400">
           <tr>
             <th scope="col" class="px-4 py-3 font-semibold">
               Reminder
@@ -176,7 +176,9 @@ function StatusPill({ status }: { status: Reminder['status'] }) {
     deleted: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-500',
   };
   return (
-    <span class={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${palette[status]}`}>
+    <span
+      class={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${palette[status]}`}
+    >
       {status}
     </span>
   );
