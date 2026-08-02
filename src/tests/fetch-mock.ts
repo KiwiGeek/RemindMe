@@ -37,11 +37,13 @@ function pathMatches(expected: string | RegExp, actual: string): boolean {
 }
 
 function takeInterceptor(url: URL, method: string): Interceptor | undefined {
+  // Match pathname (and optionally "?query") the way undici MockAgent did.
+  const candidates = url.search ? [url.pathname + url.search, url.pathname] : [url.pathname];
   const idx = interceptors.findIndex(
     (i) =>
       i.origin === url.origin &&
       i.method === method.toUpperCase() &&
-      pathMatches(i.path, `${url.pathname}${url.search}`),
+      candidates.some((p) => pathMatches(i.path, p)),
   );
   if (idx === -1) return undefined;
   return interceptors.splice(idx, 1)[0];
