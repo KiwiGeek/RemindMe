@@ -320,8 +320,8 @@ function MailgunWebhookHelp(props: { siteOrigin: string }) {
     <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3 text-sm dark:border-zinc-800 dark:bg-zinc-900/50">
       <p class="font-medium">Mailgun webhooks</p>
       <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-        In the Mailgun dashboard → Sending → Webhooks (for this domain), add an HTTP webhook pointing
-        at:
+        In the Mailgun dashboard → Sending → Webhooks (for this domain), add an HTTP webhook
+        pointing at:
       </p>
       <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
         <code class="block flex-1 break-all rounded border border-zinc-200 bg-white px-2 py-1.5 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-950">

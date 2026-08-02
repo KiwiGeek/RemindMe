@@ -138,7 +138,7 @@ body {
  * Default / missing = zinc (Tailwind built-ins, no overrides).
  */
 
-[data-palette='slate'] {
+[data-palette="slate"] {
   --color-zinc-50: #f8fafc;
   --color-zinc-100: #f1f5f9;
   --color-zinc-200: #e2e8f0;
@@ -152,7 +152,7 @@ body {
   --color-zinc-950: #020617;
 }
 
-[data-palette='stone'] {
+[data-palette="stone"] {
   --color-zinc-50: #fafaf9;
   --color-zinc-100: #f5f5f4;
   --color-zinc-200: #e7e5e4;
@@ -166,7 +166,7 @@ body {
   --color-zinc-950: #0c0a09;
 }
 
-[data-palette='graphite'] {
+[data-palette="graphite"] {
   --color-zinc-50: #fafafa;
   --color-zinc-100: #f4f4f5;
   --color-zinc-200: #e4e4e7;
@@ -180,7 +180,7 @@ body {
   --color-zinc-950: #09090b;
 }
 
-[data-palette='sage'] {
+[data-palette="sage"] {
   --color-zinc-50: #f6f7f4;
   --color-zinc-100: #eceee8;
   --color-zinc-200: #d5d9ce;
@@ -194,7 +194,7 @@ body {
   --color-zinc-950: #181b16;
 }
 
-[data-palette='forest'] {
+[data-palette="forest"] {
   --color-zinc-50: #f3f6f2;
   --color-zinc-100: #e4ebe2;
   --color-zinc-200: #c5d3c1;
@@ -208,7 +208,7 @@ body {
   --color-zinc-950: #131b13;
 }
 
-[data-palette='ocean'] {
+[data-palette="ocean"] {
   --color-zinc-50: #f4f7fb;
   --color-zinc-100: #e8eef6;
   --color-zinc-200: #cdd9e8;
@@ -222,7 +222,7 @@ body {
   --color-zinc-950: #1a222e;
 }
 
-[data-palette='mist'] {
+[data-palette="mist"] {
   --color-zinc-50: #f5f9fc;
   --color-zinc-100: #eaf2f8;
   --color-zinc-200: #d3e4f0;
@@ -236,7 +236,7 @@ body {
   --color-zinc-950: #1e2c37;
 }
 
-[data-palette='dusk'] {
+[data-palette="dusk"] {
   --color-zinc-50: #f6f6fb;
   --color-zinc-100: #ececf6;
   --color-zinc-200: #d8d8eb;
@@ -250,7 +250,7 @@ body {
   --color-zinc-950: #22222f;
 }
 
-[data-palette='clay'] {
+[data-palette="clay"] {
   --color-zinc-50: #faf7f5;
   --color-zinc-100: #f3ece8;
   --color-zinc-200: #e6d7cf;

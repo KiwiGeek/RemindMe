@@ -15,9 +15,9 @@ import {
   api,
   detectBrowserTimezone,
 } from '../api';
+import { OperatorSettings } from './OperatorSettings';
 import { ReminderForm, adminClient } from './ReminderForm';
 import { RemindersList, adminListClient } from './RemindersList';
-import { OperatorSettings } from './OperatorSettings';
 import { ThemeToggle } from './ThemeToggle';
 
 interface Props {
