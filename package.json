@@ -46,7 +46,7 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@cloudflare/vitest-pool-workers": "^0.20.1",
-    "@cloudflare/workers-types": "^4.20241224.0",
+    "@cloudflare/workers-types": "^5.20260801.1",
     "@preact/preset-vite": "^2.9.1",
     "@tailwindcss/vite": "^4.0.0",
     "@types/better-sqlite3": "^7.6.13",
@@ -64,7 +64,7 @@
     "typescript": "^5.7.2",
     "vite": "^6.4.2",
     "vitest": "^4.1.10",
-    "wrangler": "^4.95.0"
+    "wrangler": "^4.118.0"
   },
   "engines": {
     "node": ">=22"
