@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { defineWorkersConfig, readD1Migrations } from '@cloudflare/vitest-pool-workers/config';
+import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
+import { defineConfig } from 'vitest/config';
 
 // Wrangler validates `wrangler.toml`'s `[assets] directory` at config-load
 // time and refuses to start the test pool if it's missing. The SPA build
@@ -22,10 +23,35 @@ if (!existsSync(ASSETS_DIR)) {
   );
 }
 
-export default defineWorkersConfig(async () => {
+export default defineConfig(async () => {
   const migrations = await readD1Migrations('./migrations');
 
   return {
+    plugins: [
+      cloudflareTest({
+        wrangler: { configPath: './wrangler.toml' },
+        miniflare: {
+          compatibilityFlags: ['nodejs_compat'],
+          bindings: {
+            // Plumb migration metadata through so setup.ts can apply them
+            // against the test-scoped D1 database.
+            TEST_MIGRATIONS: migrations,
+            INSTANCE_SECRET: 'test-instance-secret-dddddddddddddddddddddddd',
+            SETUP_TOKEN: 'test-setup-token',
+            SITE_ORIGIN: 'http://localhost:8787',
+            MAILGUN_DOMAIN: 'example.com',
+            MAILGUN_FROM: 'Remind Me <reminders@example.com>',
+            MAILGUN_REPLY_TO: 'no-reply@example.com',
+            ADMIN_EMAILS: 'admin@example.com,super@example.com',
+            MAILGUN_API_KEY: 'test-api-key',
+            MAILGUN_SIGNING_KEY: 'test-signing-key',
+            SESSION_SECRET: 'test-session-secret-aaaaaaaaaaaaaaaaaaaaaaaaaa',
+            OTP_PEPPER: 'test-otp-pepper-bbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            ACTION_TOKEN_SECRET: 'test-action-token-secret-cccccccccccccccccc',
+          },
+        },
+      }),
+    ],
     resolve: {
       alias: {
         '~': fileURLToPath(new URL('./src', import.meta.url)),
@@ -35,39 +61,6 @@ export default defineWorkersConfig(async () => {
       include: ['src/**/*.test.ts'],
       setupFiles: ['./src/tests/setup.ts'],
       testTimeout: 30_000,
-      poolOptions: {
-        workers: {
-          // singleWorker forces all test files into one Miniflare instance.
-          // Without this on Windows, workerd's localhost fallback module
-          // service occasionally has its loopback connections refused
-          // (Win32 #52 / #1225) when multiple Miniflare instances spin up
-          // in parallel, causing flakes like
-          // "No such module .../tsyringe/.../singleton". Tests run a touch
-          // slower in single-worker mode but are deterministic.
-          singleWorker: true,
-          wrangler: { configPath: './wrangler.toml' },
-          miniflare: {
-            compatibilityFlags: ['nodejs_compat'],
-            bindings: {
-              // Plumb migration metadata through so setup.ts can apply them
-              // against the test-scoped D1 database.
-              TEST_MIGRATIONS: migrations,
-              INSTANCE_SECRET: 'test-instance-secret-dddddddddddddddddddddddd',
-              SETUP_TOKEN: 'test-setup-token',
-              SITE_ORIGIN: 'http://localhost:8787',
-              MAILGUN_DOMAIN: 'example.com',
-              MAILGUN_FROM: 'Remind Me <reminders@example.com>',
-              MAILGUN_REPLY_TO: 'no-reply@example.com',
-              ADMIN_EMAILS: 'admin@example.com,super@example.com',
-              MAILGUN_API_KEY: 'test-api-key',
-              MAILGUN_SIGNING_KEY: 'test-signing-key',
-              SESSION_SECRET: 'test-session-secret-aaaaaaaaaaaaaaaaaaaaaaaaaa',
-              OTP_PEPPER: 'test-otp-pepper-bbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-              ACTION_TOKEN_SECRET: 'test-action-token-secret-cccccccccccccccccc',
-            },
-          },
-        },
-      },
     },
   };
 });
