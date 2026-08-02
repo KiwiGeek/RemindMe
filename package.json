@@ -62,7 +62,7 @@
     "preact": "^10.25.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
-    "vite": "^6.4.2",
+    "vite": "^8.2.0",
     "vitest": "^4.1.10",
     "wrangler": "^4.118.0"
   },
