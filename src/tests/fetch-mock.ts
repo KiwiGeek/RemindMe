@@ -70,7 +70,7 @@ async function mockedFetch(input: RequestInfo | URL, init?: RequestInit): Promis
 
   return new Response(reply, {
     status: matched.status,
-    headers: matched.headers,
+    ...(matched.headers ? { headers: matched.headers } : {}),
   });
 }
 
@@ -80,14 +80,15 @@ class MockPool {
   intercept(opts: InterceptOptions) {
     return {
       reply: (status: number, body: ReplyBody, replyOpts?: ReplyOptions) => {
-        interceptors.push({
+        const interceptor: Interceptor = {
           origin: this.origin,
           method: (opts.method ?? 'GET').toUpperCase(),
           path: opts.path,
           status,
           body,
-          headers: replyOpts?.headers,
-        });
+        };
+        if (replyOpts?.headers) interceptor.headers = replyOpts.headers;
+        interceptors.push(interceptor);
       },
     };
   }
