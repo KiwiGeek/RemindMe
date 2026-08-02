@@ -1,5 +1,6 @@
-import { SELF, env, fetchMock } from 'cloudflare:test';
+import { SELF, env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { fetchMock } from './fetch-mock';
 
 const MAILGUN_BASE = 'https://api.mailgun.net';
 

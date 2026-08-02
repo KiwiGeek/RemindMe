@@ -1,11 +1,11 @@
-/// <reference types="@cloudflare/vitest-pool-workers" />
+/// <reference types="@cloudflare/vitest-pool-workers/types" />
 
-import type { Env } from '../env';
+type _WorkerEnv = import('../env').Env;
 
-declare module 'cloudflare:test' {
-  interface ProvidedEnv extends Env {
+declare namespace Cloudflare {
+  interface Env extends _WorkerEnv {
     DB: D1Database;
     KV: KVNamespace;
-    TEST_MIGRATIONS: D1Migration[];
+    TEST_MIGRATIONS: import('cloudflare:test').D1Migration[];
   }
 }

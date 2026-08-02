@@ -1,11 +1,6 @@
-import { applyD1Migrations, env, fetchMock } from 'cloudflare:test';
+import { applyD1Migrations, env } from 'cloudflare:test';
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
-
-declare module 'cloudflare:test' {
-  interface ProvidedEnv {
-    TEST_MIGRATIONS: D1Migration[];
-  }
-}
+import { fetchMock } from './fetch-mock';
 
 beforeAll(async () => {
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);

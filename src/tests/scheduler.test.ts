@@ -1,9 +1,10 @@
-import { env, fetchMock } from 'cloudflare:test';
+import { env } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '~/db/client';
 import { reminderFires, reminders, suppressions, users } from '~/db/schema';
 import { LOOKAHEAD_MS, runScheduledTick } from '~/lib/scheduler';
+import { fetchMock } from './fetch-mock';
 
 const MAILGUN_BASE = 'https://api.mailgun.net';
 const SEND_PATH = '/v3/example.com/messages';

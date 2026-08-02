@@ -1,5 +1,6 @@
-import { SELF, env, fetchMock } from 'cloudflare:test';
+import { SELF, env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { fetchMock } from './fetch-mock';
 
 function mailgunSigningKey(): string {
   const s = env.MAILGUN_SIGNING_KEY;
