@@ -20,7 +20,8 @@
 
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { AppBindings, Env } from '~/env';
+import type { AppBindings } from '~/env';
+import type { KvStore } from '~/platform/kv';
 
 /** Where the WebAuthn ceremony is happening, derived from the request. */
 export interface RpInfo {
@@ -46,10 +47,11 @@ export function getRpInfo(c: Context<AppBindings>): RpInfo {
   if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost') {
     throw new HTTPException(400, { message: 'insecure_origin' });
   }
+  const config = c.get('config');
   return {
     rpID: parsed.hostname,
     expectedOrigin: origin,
-    rpName: c.env.APP_NAME,
+    rpName: config?.appName ?? c.env.APP_NAME ?? 'Remind Me',
   };
 }
 
@@ -66,40 +68,40 @@ export function getRpInfo(c: Context<AppBindings>): RpInfo {
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 
 export async function saveRegistrationChallenge(
-  env: Env,
+  kv: KvStore,
   userId: number,
   challenge: string,
 ): Promise<void> {
-  await env.KV.put(`pk:reg:${userId}`, challenge, {
+  await kv.put(`pk:reg:${userId}`, challenge, {
     expirationTtl: CHALLENGE_TTL_SECONDS,
   });
 }
 
 export async function consumeRegistrationChallenge(
-  env: Env,
+  kv: KvStore,
   userId: number,
 ): Promise<string | null> {
   const key = `pk:reg:${userId}`;
-  const value = await env.KV.get(key);
+  const value = await kv.get(key);
   if (!value) return null;
-  await env.KV.delete(key);
+  await kv.delete(key);
   return value;
 }
 
-export async function saveAuthenticationChallenge(env: Env, challenge: string): Promise<void> {
-  await env.KV.put(`pk:auth:${challenge}`, '1', {
+export async function saveAuthenticationChallenge(kv: KvStore, challenge: string): Promise<void> {
+  await kv.put(`pk:auth:${challenge}`, '1', {
     expirationTtl: CHALLENGE_TTL_SECONDS,
   });
 }
 
 export async function consumeAuthenticationChallenge(
-  env: Env,
+  kv: KvStore,
   challenge: string,
 ): Promise<boolean> {
   const key = `pk:auth:${challenge}`;
-  const value = await env.KV.get(key);
+  const value = await kv.get(key);
   if (!value) return false;
-  await env.KV.delete(key);
+  await kv.delete(key);
   return true;
 }
 

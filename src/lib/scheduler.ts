@@ -16,7 +16,7 @@
  */
 
 import { and, eq, isNotNull, lte, ne, sql } from 'drizzle-orm';
-import { getDb } from '~/db/client';
+import { type AppDb, getDb } from '~/db/client';
 import {
   type Reminder,
   type User,
@@ -27,8 +27,11 @@ import {
 } from '~/db/schema';
 import type { Env } from '~/env';
 import { FIRE_ACTIONS, type FireAction, signFireAction, signMagicLink } from '~/lib/actionToken';
+import { type AppConfig, loadConfig, mailMessageDomain, maybeBridgeFromEnv } from '~/lib/config';
 import { type ReminderEmailLinks, buildReminderEmail } from '~/lib/emails/reminder';
-import { MailgunClient, MailgunError } from '~/lib/mailgun';
+import { createMailTransport } from '~/lib/mail/createTransport';
+import type { MailTransport } from '~/lib/mail/transport';
+import { MailTransportError } from '~/lib/mail/transport';
 import { nextFires } from '~/lib/recurrence';
 import { renderReminder } from '~/lib/render';
 
@@ -45,7 +48,12 @@ export interface TickStats {
 
 export async function runScheduledTick(env: Env, now: Date = new Date()): Promise<TickStats> {
   const db = getDb(env);
-  const mailgun = new MailgunClient(env);
+  const config = (await maybeBridgeFromEnv(env, db)) ?? (await loadConfig(db, env.INSTANCE_SECRET));
+  if (!config) {
+    console.warn('scheduler: setup not complete; skipping tick');
+    return { scanned: 0, sent: 0, skipped: 0, failed: 0 };
+  }
+  const mail = await createMailTransport(config, env);
   const horizon = new Date(now.getTime() + LOOKAHEAD_MS).toISOString();
   const stats: TickStats = { scanned: 0, sent: 0, skipped: 0, failed: 0 };
 
@@ -70,7 +78,7 @@ export async function runScheduledTick(env: Env, now: Date = new Date()): Promis
 
   for (const row of due) {
     try {
-      const result = await dispatchOne(env, db, mailgun, row.reminder, row.user, now);
+      const result = await dispatchOne(config, db, mail, row.reminder, row.user, now);
       stats[result] += 1;
     } catch (err) {
       // dispatchOne already records per-fire errors. Catching here means a
@@ -89,9 +97,9 @@ export async function runScheduledTick(env: Env, now: Date = new Date()): Promis
 type DispatchOutcome = 'sent' | 'skipped' | 'failed';
 
 async function dispatchOne(
-  env: Env,
-  db: ReturnType<typeof getDb>,
-  mailgun: MailgunClient,
+  config: AppConfig,
+  db: AppDb,
+  mail: MailTransport,
   reminder: Reminder,
   user: User,
   now: Date,
@@ -142,12 +150,12 @@ async function dispatchOne(
     userEmail: user.email,
   });
 
-  const links = await buildLinks(env, reminder.id, claim.fireId, user.id);
+  const links = await buildLinks(config, reminder.id, claim.fireId, user.id);
   const email = buildReminderEmail({ rendered, links });
-  const messageId = `reminder-${reminder.id}-${encodeURIComponent(fireAt)}@${env.MAILGUN_DOMAIN}`;
+  const messageId = `reminder-${reminder.id}-${encodeURIComponent(fireAt)}@${mailMessageDomain(config)}`;
 
   try {
-    const result = await mailgun.send({
+    const result = await mail.send({
       to: user.email,
       subject: email.subject,
       text: email.text,
@@ -169,7 +177,7 @@ async function dispatchOne(
     return 'sent';
   } catch (err) {
     const message =
-      err instanceof MailgunError
+      err instanceof MailTransportError
         ? `${err.message}: ${err.body.slice(0, 500)}`
         : err instanceof Error
           ? err.message
@@ -189,7 +197,7 @@ interface ClaimResult {
 }
 
 async function claimFire(
-  db: ReturnType<typeof getDb>,
+  db: AppDb,
   reminderId: number,
   fireAt: string,
   status: 'queued' | 'skipped',
@@ -219,16 +227,16 @@ async function claimFire(
 }
 
 async function buildLinks(
-  env: Env,
+  config: AppConfig,
   reminderId: number,
   fireId: number,
   userId: number,
 ): Promise<ReminderEmailLinks> {
-  const origin = env.SITE_ORIGIN;
+  const origin = config.siteOrigin;
   const fireActions = {} as Record<FireAction, string>;
   await Promise.all(
     FIRE_ACTIONS.map(async (op) => {
-      const token = await signFireAction(env.ACTION_TOKEN_SECRET, {
+      const token = await signFireAction(config.actionTokenSecret, {
         rid: reminderId,
         fid: fireId,
         op,
@@ -236,7 +244,7 @@ async function buildLinks(
       fireActions[op] = `${origin}/r/${token}`;
     }),
   );
-  const magicToken = await signMagicLink(env.ACTION_TOKEN_SECRET, userId);
+  const magicToken = await signMagicLink(config.actionTokenSecret, userId);
   return {
     fireActions,
     manageUrl: `${origin}/r/${magicToken}`,
@@ -244,7 +252,7 @@ async function buildLinks(
   };
 }
 
-async function countSentFires(db: ReturnType<typeof getDb>, reminderId: number): Promise<number> {
+async function countSentFires(db: AppDb, reminderId: number): Promise<number> {
   const rows = await db
     .select({ n: sql<number>`count(*)` })
     .from(reminderFires)
@@ -253,7 +261,7 @@ async function countSentFires(db: ReturnType<typeof getDb>, reminderId: number):
 }
 
 async function advanceReminder(
-  db: ReturnType<typeof getDb>,
+  db: AppDb,
   reminder: Reminder,
   nextFireUtc: string | null,
 ): Promise<void> {

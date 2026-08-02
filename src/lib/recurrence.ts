@@ -16,7 +16,7 @@
  */
 
 import { DateTime } from 'luxon';
-import { RRule } from 'rrule';
+import { RRule } from '~/lib/rruleCompat';
 
 export interface RecurrenceInputs {
   rrule: string;
@@ -67,7 +67,7 @@ export function validateInputs(inputs: RecurrenceInputs): void {
   }
 }
 
-function buildRule(inputs: RecurrenceInputs): RRule {
+function buildRule(inputs: RecurrenceInputs): InstanceType<typeof RRule> {
   const opts = RRule.parseString(inputs.rrule);
   const dt = DateTime.fromISO(inputs.dtstart, { setZone: false });
   const dtstart = new Date(Date.UTC(dt.year, dt.month - 1, dt.day, dt.hour, dt.minute, dt.second));
@@ -127,7 +127,7 @@ export function nextFires(
 
   if (!opts.afterUtc) {
     let i = 0;
-    const all = rule.all((_, idx) => {
+    const all = rule.all((_: Date, idx: number) => {
       i = idx;
       return idx < count && i < maxIter;
     });

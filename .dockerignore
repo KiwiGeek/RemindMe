@@ -1,0 +1,27 @@
+# Keep host node_modules out of the image — they break native addons
+# (better-sqlite3 "invalid ELF header" on Linux).
+node_modules
+web/node_modules
+
+# Build artifacts / local data
+web/dist
+data
+.git
+.wrangler
+.devtools
+coverage
+dist
+
+# Local secrets & env (compose injects from host .env)
+.dev.vars
+.env
+.env.*
+!.env.example
+
+# Editor / OS noise
+.cursor
+*.md
+!README.md
+LICENSE
+.DS_Store
+Thumbs.db

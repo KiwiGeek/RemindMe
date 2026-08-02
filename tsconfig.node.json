@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": ["src/node.ts", "src/**/*.ts"],
+  "exclude": ["src/tests", "web", "node_modules"]
+}

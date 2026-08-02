@@ -1,20 +1,23 @@
 import { zValidator } from '@hono/zod-validator';
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { getDb } from '~/db/client';
+import { users } from '~/db/schema';
 import type { AppBindings } from '~/env';
 import { otpLoginLinkKvKey, signOtpLoginLink } from '~/lib/actionToken';
-import { hashOtp, randomHex, randomNumericCode } from '~/lib/crypto';
+import { hashOtp, randomHex, randomNumericCode, timingSafeEqual } from '~/lib/crypto';
 import { renderOtpEmail } from '~/lib/emails/otp';
-import { MailgunClient } from '~/lib/mailgun';
+import { createMailTransport } from '~/lib/mail/createTransport';
 import { rateLimit } from '~/lib/ratelimit';
 import { clearSessionCookie } from '~/lib/session';
 import { signInAfterEmailProof } from '~/lib/signIn';
+import { getKv } from '~/platform/getKv';
 import { presentUser } from '~/routes/me';
 
 const OTP_TTL_SECONDS = 10 * 60;
 const OTP_MAX_ATTEMPTS = 5;
 
-/** Sliding-ish window: 5 codes per email per hour, 20 per IP per hour. */
 const REQUEST_RATE_PER_EMAIL = { max: 5, windowSeconds: 3600 };
 const REQUEST_RATE_PER_IP = { max: 20, windowSeconds: 3600 };
 
@@ -39,74 +42,94 @@ function otpKey(email: string): string {
   return `otp:${email}`;
 }
 
-function clientIp(c: { req: { header: (h: string) => string | undefined } }): string {
-  return c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? '0.0.0.0';
+function clientIp(c: {
+  req: { header: (h: string) => string | undefined };
+  env: AppBindings['Bindings'];
+}): string {
+  const trust = c.env.TRUST_PROXY === '1' || c.env.TRUST_PROXY === 'true';
+  const cf = c.req.header('cf-connecting-ip');
+  if (cf) return cf;
+  if (trust) {
+    const xff = c.req.header('x-forwarded-for');
+    if (xff) return xff.split(',')[0]?.trim() || '0.0.0.0';
+  }
+  return c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? '0.0.0.0';
 }
 
 export const auth = new Hono<AppBindings>()
   .post('/request', zValidator('json', requestBody), async (c) => {
+    const config = c.get('config');
+    if (!config) return c.json({ error: 'setup_required' }, 503);
+
     const { email } = c.req.valid('json');
     const ip = clientIp(c);
+    const kv = getKv(c.env);
+    const db = getDb(c.env);
 
     const [ipLimit, emailLimit] = await Promise.all([
       rateLimit(
-        c.env.KV,
+        kv,
         `auth:req:ip:${ip}`,
         REQUEST_RATE_PER_IP.max,
         REQUEST_RATE_PER_IP.windowSeconds,
       ),
       rateLimit(
-        c.env.KV,
+        kv,
         `auth:req:email:${email}`,
         REQUEST_RATE_PER_EMAIL.max,
         REQUEST_RATE_PER_EMAIL.windowSeconds,
       ),
     ]);
 
-    // Always 204 — never reveal whether the email exists or whether the
-    // limit was hit, to thwart enumeration / harassment.
     if (!ipLimit.allowed || !emailLimit.allowed) {
       console.warn('auth.request rate limited', { ip, email });
       return c.body(null, 204);
     }
 
+    // Closed registration: only existing users may request OTP.
+    if (config.registrationMode === 'closed') {
+      const existing = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      if (!existing[0]) {
+        return c.body(null, 204);
+      }
+    }
+
     const code = randomNumericCode(6);
-    const hash = await hashOtp(c.env.OTP_PEPPER, code);
+    const hash = await hashOtp(config.otpPepper, code);
     const stored: StoredOtp = { hash, attempts: 0, createdAt: Math.floor(Date.now() / 1000) };
-    await c.env.KV.put(otpKey(email), JSON.stringify(stored), {
+    await kv.put(otpKey(email), JSON.stringify(stored), {
       expirationTtl: OTP_TTL_SECONDS,
     });
 
-    const mg = new MailgunClient(c.env);
+    const mail = await createMailTransport(config, c.env);
 
-    // User-initiated send: pre-clear any prior Mailgun suppression so a
-    // previously-bounced address can recover. This is a *best-effort* step —
-    // if it fails (wrong API scope, transient network, etc.) we still want
-    // to attempt the actual OTP send below for the 99% case where the
-    // address isn't suppressed.
     try {
-      await mg.clearSuppressions(email);
+      await mail.clearSuppressions(email);
     } catch (err) {
       console.warn('auth.request: clearSuppressions failed; proceeding to send', err);
     }
 
     try {
       const jti = randomHex(16);
-      const loginToken = await signOtpLoginLink(c.env.ACTION_TOKEN_SECRET, email, jti, {
+      const loginToken = await signOtpLoginLink(config.actionTokenSecret, email, jti, {
         ttlSec: OTP_TTL_SECONDS,
       });
-      await c.env.KV.put(otpLoginLinkKvKey(jti), email, {
+      await kv.put(otpLoginLinkKvKey(jti), email, {
         expirationTtl: OTP_TTL_SECONDS,
       });
 
-      const signInUrl = new URL(`/r/${loginToken}`, c.env.SITE_ORIGIN).href;
+      const signInUrl = new URL(`/r/${loginToken}`, config.siteOrigin).href;
       const { subject, text, html } = renderOtpEmail({
-        appName: c.env.APP_NAME,
+        appName: config.appName,
         code,
         expiresInMinutes: Math.floor(OTP_TTL_SECONDS / 60),
         signInUrl,
       });
-      await mg.send({
+      await mail.send({
         to: email,
         subject,
         text,
@@ -114,50 +137,58 @@ export const auth = new Hono<AppBindings>()
         tags: ['otp'],
       });
     } catch (err) {
-      console.error('auth.request: mailgun send failed', err);
-      // Still respond 204 — same shape as success — to keep enumeration shut.
+      console.error('auth.request: mail send failed', err);
     }
 
     return c.body(null, 204);
   })
   .post('/verify', zValidator('json', verifyBody), async (c) => {
-    const { email, code } = c.req.valid('json');
+    const config = c.get('config');
+    if (!config) return c.json({ error: 'setup_required' }, 503);
 
-    const raw = await c.env.KV.get(otpKey(email));
+    const { email, code } = c.req.valid('json');
+    const kv = getKv(c.env);
+
+    const raw = await kv.get(otpKey(email));
     if (!raw) {
       return c.json({ error: 'invalid_or_expired' }, 400);
     }
     const stored = JSON.parse(raw) as StoredOtp;
 
     if (stored.attempts >= OTP_MAX_ATTEMPTS) {
-      await c.env.KV.delete(otpKey(email));
+      await kv.delete(otpKey(email));
       return c.json({ error: 'too_many_attempts' }, 400);
     }
 
-    const presentedHash = await hashOtp(c.env.OTP_PEPPER, code);
-    const ok = presentedHash === stored.hash;
+    const presentedHash = await hashOtp(config.otpPepper, code);
+    const ok = timingSafeEqual(presentedHash, stored.hash);
 
     if (!ok) {
       stored.attempts += 1;
-      // Keep the remaining TTL roughly intact — refresh based on age.
       const ttlLeft = Math.max(
         30,
         OTP_TTL_SECONDS - (Math.floor(Date.now() / 1000) - stored.createdAt),
       );
-      await c.env.KV.put(otpKey(email), JSON.stringify(stored), {
+      await kv.put(otpKey(email), JSON.stringify(stored), {
         expirationTtl: ttlLeft,
       });
       return c.json({ error: 'invalid_or_expired' }, 400);
     }
 
-    await c.env.KV.delete(otpKey(email));
+    await kv.delete(otpKey(email));
 
-    const user = await signInAfterEmailProof(c.env, c, email);
+    const user = await signInAfterEmailProof(c.env, c, email, {
+      sessionSecret: config.sessionSecret,
+      registrationMode: config.registrationMode,
+    });
+    if (user === 'registration_closed') {
+      return c.json({ error: 'registration_closed' }, 403);
+    }
     if (!user) {
       return c.json({ error: 'internal' }, 500);
     }
 
-    return c.json({ user: presentUser(c.env, user) });
+    return c.json({ user: presentUser(user) });
   })
   .post('/logout', (c) => {
     clearSessionCookie(c);

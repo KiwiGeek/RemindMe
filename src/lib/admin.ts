@@ -1,23 +1,12 @@
 /**
- * Admin authorization plumbing.
- *
- * Source of truth for who's an admin is `env.ADMIN_EMAILS` — a
- * comma-separated, case-insensitive list defined in `wrangler.toml`'s
- * `[vars]` block. Storing this in the worker config (not the DB) means
- * escalating to admin requires shipping a new Worker version, which in turn
- * requires already controlling the deploy pipeline. A DB-stored flag would
- * grant the same capability to anyone with D1 write access.
- *
- * Every mutating admin route writes to `audit_log`. We never impersonate:
- * the admin's session stays the admin's session; the *target* user_id
- * comes from the URL, never from the session, so a stale browser tab can't
- * accidentally cross-edit.
+ * Admin authorization. Source of truth is `users.is_admin` (set by setup
+ * wizard or an existing admin). Legacy ADMIN_EMAILS is only used by the
+ * env→settings bridge on upgrade.
  */
 
 import { eq } from 'drizzle-orm';
-import type { getDb } from '~/db/client';
+import type { AppDb } from '~/db/client';
 import { auditLog, users } from '~/db/schema';
-import type { Env } from '~/env';
 
 export function parseAdminEmails(raw: string | undefined | null): string[] {
   if (!raw) return [];
@@ -27,44 +16,35 @@ export function parseAdminEmails(raw: string | undefined | null): string[] {
     .filter((s) => s.length > 0 && s.includes('@'));
 }
 
-export function isAdminEmail(env: Env, email: string): boolean {
-  const list = parseAdminEmails(env.ADMIN_EMAILS);
-  return list.includes(email.trim().toLowerCase());
-}
-
-/** Look up `userId` and decide admin-ness from the persisted email. */
-export async function isAdminUserId(
-  env: Env,
-  db: ReturnType<typeof getDb>,
-  userId: number,
-): Promise<boolean> {
+export async function isAdminUserId(db: AppDb, userId: number): Promise<boolean> {
   const row = (
-    await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1)
+    await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, userId)).limit(1)
   )[0];
-  if (!row) return false;
-  return isAdminEmail(env, row.email);
+  return row?.isAdmin === 1;
 }
 
 export type AdminEvent =
   | 'admin_user_create'
   | 'admin_user_timezone_change'
+  | 'admin_user_promote'
   | 'admin_reminder_create'
   | 'admin_reminder_update'
-  | 'admin_reminder_delete';
+  | 'admin_reminder_delete'
+  | 'admin_settings_update'
+  | 'admin_test_email'
+  | 'admin_export'
+  | 'admin_import';
 
 export interface AdminAuditMeta {
-  /** Always populated with the admin's user_id. */
   admin_user_id: number;
-  /** Always populated with the target user_id. */
-  target_user_id: number;
-  /** Optional reminder_id for reminder events. */
+  target_user_id?: number;
   reminder_id?: number;
-  /** Free-form payload describing the change. */
+  to?: string;
   change?: Record<string, unknown>;
 }
 
 export async function writeAudit(
-  db: ReturnType<typeof getDb>,
+  db: AppDb,
   event: AdminEvent,
   meta: AdminAuditMeta,
 ): Promise<void> {

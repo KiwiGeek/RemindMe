@@ -1,47 +1,12 @@
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
-import { logger } from 'hono/logger';
-import type { AppBindings, Env } from '~/env';
+import { createApp } from '~/app';
+import { getDb } from '~/db/client';
+import type { Env } from '~/env';
 import { checkEnv } from '~/lib/envCheck';
 import { pruneOldRows } from '~/lib/retention';
 import { runScheduledTick } from '~/lib/scheduler';
-import { admin } from '~/routes/admin';
-import { auth } from '~/routes/auth';
-import { healthz } from '~/routes/healthz';
-import { me } from '~/routes/me';
-import { passkeysRoute } from '~/routes/passkeys';
-import { r } from '~/routes/r';
-import { remindersRoute } from '~/routes/reminders';
-import { webhooks } from '~/routes/webhooks';
+import { SqliteKv } from '~/platform/sqliteKv';
 
-const app = new Hono<AppBindings>();
-
-app.use('*', logger());
-app.use('*', async (c, next) => {
-  checkEnv(c.env);
-  await next();
-});
-
-app.route('/api/healthz', healthz);
-app.route('/api/auth', auth);
-app.route('/api/me', me);
-app.route('/api/reminders', remindersRoute);
-app.route('/api/passkeys', passkeysRoute);
-app.route('/api/admin', admin);
-app.route('/webhooks', webhooks);
-app.route('/r', r);
-
-app.onError((err, c) => {
-  if (err instanceof HTTPException) {
-    return c.json({ error: err.message }, err.status);
-  }
-  console.error('unhandled error', err);
-  return c.json({ error: 'internal' }, 500);
-});
-
-// Anything not handled by /api/* falls through to the static SPA shell.
-// `assets.not_found_handling = "single-page-application"` in wrangler.toml
-// ensures unknown paths serve index.html for client-side routing.
+const app = createApp();
 
 export default {
   fetch: app.fetch,
@@ -56,13 +21,14 @@ export default {
         } catch (err) {
           console.error('scheduler tick failed', err);
         }
-        // Retention pruning runs after the send tick so a prune failure
-        // can never block a send. It's also wrapped in its own try/catch
-        // for the same reason; the next tick (5 min away) will retry.
         try {
-          const pruned = await pruneOldRows(env, new Date(event.scheduledTime));
+          const db = getDb(env);
+          const pruned = await pruneOldRows(db, new Date(event.scheduledTime));
           if (pruned.firesDeleted > 0 || pruned.auditDeleted > 0) {
             console.log('retention prune', pruned);
+          }
+          if (env.__kv instanceof SqliteKv) {
+            await env.__kv.pruneExpired(new Date(event.scheduledTime));
           }
         } catch (err) {
           console.error('retention prune failed', err);

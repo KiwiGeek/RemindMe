@@ -3,12 +3,14 @@ import { ApiError, type CurrentUser, api } from './api';
 import { AdminConsole } from './components/AdminConsole';
 import { Dashboard } from './components/Dashboard';
 import { Settings } from './components/Settings';
+import { SetupWizard } from './components/SetupWizard';
 import { SignIn } from './components/SignIn';
 
 type View = 'dashboard' | 'admin' | 'settings';
 
 type State =
   | { kind: 'loading' }
+  | { kind: 'setup' }
   | { kind: 'signed_out' }
   | { kind: 'signed_in'; user: CurrentUser; view: View };
 
@@ -17,20 +19,42 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
+
+    function loadSession() {
+      return api
+        .me()
+        .then(({ user }) => {
+          if (!cancelled) setState({ kind: 'signed_in', user, view: 'dashboard' });
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          if (err instanceof ApiError && err.status === 503) {
+            setState({ kind: 'setup' });
+            return;
+          }
+          if (err instanceof ApiError && err.status === 401) {
+            setState({ kind: 'signed_out' });
+          } else {
+            console.error('initial /me check failed', err);
+            setState({ kind: 'signed_out' });
+          }
+        });
+    }
+
     api
-      .me()
-      .then(({ user }) => {
-        if (!cancelled) setState({ kind: 'signed_in', user, view: 'dashboard' });
+      .setupStatus()
+      .then(({ completed }) => {
+        if (cancelled) return;
+        if (!completed) {
+          setState({ kind: 'setup' });
+          return;
+        }
+        return loadSession();
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401) {
-          setState({ kind: 'signed_out' });
-        } else {
-          // Treat unknown errors as signed-out so the user has *some* UI.
-          console.error('initial /me check failed', err);
-          setState({ kind: 'signed_out' });
-        }
+        console.error('setup status check failed', err);
+        void loadSession();
       });
     return () => {
       cancelled = true;
@@ -47,6 +71,16 @@ export function App() {
         <span class="inline-block size-6 animate-pulse rounded-full bg-zinc-300/80 dark:bg-zinc-700" />
         <span class="text-sm font-medium tracking-tight">Loading…</span>
       </main>
+    );
+  }
+
+  if (state.kind === 'setup') {
+    return (
+      <SetupWizard
+        onCompleted={() => {
+          setState({ kind: 'signed_out' });
+        }}
+      />
     );
   }
 

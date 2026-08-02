@@ -1,23 +1,17 @@
 /**
- * Tiny fixed-window rate limiter on KV.
- *
- * - Buckets by `Math.floor(now / windowSeconds)` so the key naturally
- *   rotates without us having to delete anything.
- * - KV `put` has a 60-second eventual-consistency window; for "5 per hour"
- *   limits that's fine.
- * - Read-modify-write race: an attacker hammering in parallel could squeeze
- *   a couple of extra requests through. Acceptable at our scale; if it ever
- *   matters, swap to the Workers Rate Limiting API.
+ * Tiny fixed-window rate limiter on KvStore.
  */
+
+import type { KvStore } from '~/platform/kv';
 
 export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
-  resetAt: number; // unix seconds
+  resetAt: number;
 }
 
 export async function rateLimit(
-  kv: KVNamespace,
+  kv: KvStore,
   key: string,
   max: number,
   windowSeconds: number,

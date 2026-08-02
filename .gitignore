@@ -1,9 +1,6 @@
 node_modules/
 .wrangler/
 .wrangler-dev-test.*
-.dev.vars
-.dev.vars.*
-!.dev.vars.example
 dist/
 web/dist/
 .vite/
@@ -14,6 +11,14 @@ coverage/
 .vscode/
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# Local secrets (Workers / Docker)
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 .env
 .env.*
 !.env.example
+
+# Docker/Node local SQLite volume (compose mounts ./data)
+data/

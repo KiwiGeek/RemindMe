@@ -48,6 +48,9 @@ jobs:
       - name: Unit + integration tests (vitest, workers pool)
         run: npm test -- --run
 
+      - name: Docker image build
+        run: docker build -t remindme:ci .
+
   deploy:
     name: deploy to Cloudflare Workers
     needs: check

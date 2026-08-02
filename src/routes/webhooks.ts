@@ -64,13 +64,18 @@ export const webhooks = new Hono<AppBindings>().post('/mailgun', async (c) => {
     return c.json({ error: 'missing_signature' }, 401);
   }
 
-  const verification = await verifyMailgunSignature(c.env.MAILGUN_SIGNING_KEY, sig);
+  const config = c.get('config');
+  if (!config) {
+    return c.json({ error: 'setup_required' }, 503);
+  }
+
+  const verification = await verifyMailgunSignature(config.mailgunSigningKey, sig);
   if (!verification.ok) {
     console.warn('mailgun webhook rejected', verification.reason);
     return c.json({ error: verification.reason }, 401);
   }
 
-  const fresh = await dedupeMailgunToken(c.env, sig.token);
+  const fresh = await dedupeMailgunToken(c.get('kv'), sig.token);
   if (!fresh) {
     // 200 so Mailgun considers it delivered. The audit row from the first
     // delivery is the source of truth.

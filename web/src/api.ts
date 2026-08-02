@@ -221,7 +221,94 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+
+  setupStatus: () => call<{ completed: boolean; smtpAllowed: boolean }>('/api/setup/status'),
+  setupComplete: (input: SetupInput) =>
+    call<{ ok: true }>('/api/setup', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  setupImport: (input: {
+    setupToken: string;
+    passphrase?: string;
+    bundle: unknown;
+  }) =>
+    call<{ ok: true }>('/api/setup/import', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  adminGetSettings: () =>
+    call<{ settings: AppSettings; smtpAllowed: boolean }>('/api/admin/settings'),
+  adminUpdateSettings: (patch: Partial<AppSettings>) =>
+    call<{ settings: AppSettings; smtpAllowed: boolean }>('/api/admin/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  adminTestEmail: (to?: string) =>
+    call<{ ok: true; to: string }>('/api/admin/settings/test-email', {
+      method: 'POST',
+      body: JSON.stringify({ to }),
+    }),
+  adminSetUserAdmin: (id: number, isAdmin: boolean) =>
+    call<{ user: AdminUser }>(`/api/admin/users/${id}/admin`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isAdmin }),
+    }),
+  adminExport: (passphrase?: string) =>
+    call<{ bundle: unknown }>('/api/admin/export', {
+      method: 'POST',
+      body: JSON.stringify({ passphrase: passphrase?.trim() || undefined }),
+    }),
+  adminImport: (bundle: unknown, passphrase?: string) =>
+    call<{ ok: true }>('/api/admin/import', {
+      method: 'POST',
+      body: JSON.stringify({
+        passphrase: passphrase?.trim() || undefined,
+        bundle,
+        confirm: true,
+      }),
+    }),
 };
+
+export interface SetupInput {
+  setupToken: string;
+  adminEmail: string;
+  timezone: string;
+  appName: string;
+  siteOrigin: string;
+  mailProvider: 'mailgun' | 'smtp';
+  mailgunRegion: 'us' | 'eu';
+  mailgunDomain: string;
+  mailgunFrom: string;
+  mailgunReplyTo: string;
+  mailgunApiKey: string;
+  mailgunSigningKey: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser: string;
+  smtpPass: string;
+  registrationMode: 'open' | 'closed';
+}
+
+export interface AppSettings {
+  appName: string;
+  siteOrigin: string;
+  mailProvider: 'mailgun' | 'smtp';
+  mailgunRegion: 'us' | 'eu';
+  mailgunDomain: string;
+  mailgunFrom: string;
+  mailgunReplyTo: string;
+  mailgunApiKey: string;
+  mailgunSigningKey: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser: string;
+  smtpPass: string;
+  registrationMode: 'open' | 'closed';
+}
 
 export function detectBrowserTimezone(): string {
   try {

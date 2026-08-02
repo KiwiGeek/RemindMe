@@ -36,6 +36,7 @@ import {
 import { nextFires } from '~/lib/recurrence';
 import { signSession, writeSessionCookie } from '~/lib/session';
 import { signInAfterEmailProof } from '~/lib/signIn';
+import { getKv } from '~/platform/getKv';
 
 type Ctx = Context<AppBindings>;
 
@@ -44,10 +45,17 @@ export const r = new Hono<AppBindings>()
   .post('/:token', (c) => handle(c, c.req.param('token'), 'POST'));
 
 async function handle(c: Ctx, token: string, method: 'GET' | 'POST') {
-  const otpLink = await verifyOtpLoginLink(c.env.ACTION_TOKEN_SECRET, token);
+  const config = c.get('config');
+  if (!config) {
+    return c.html(page('Setup required', 'This instance has not been configured yet.'), 503);
+  }
+
+  const kv = getKv(c.env);
+
+  const otpLink = await verifyOtpLoginLink(config.actionTokenSecret, token);
   if (otpLink) {
     const kvKey = otpLoginLinkKvKey(otpLink.jti);
-    const storedEmail = await c.env.KV.get(kvKey);
+    const storedEmail = await kv.get(kvKey);
     if (!storedEmail || storedEmail !== otpLink.email) {
       return c.html(
         page(
@@ -57,10 +65,13 @@ async function handle(c: Ctx, token: string, method: 'GET' | 'POST') {
         410,
       );
     }
-    await c.env.KV.delete(kvKey);
+    await kv.delete(kvKey);
 
-    const user = await signInAfterEmailProof(c.env, c, otpLink.email);
-    if (!user) {
+    const user = await signInAfterEmailProof(c.env, c, otpLink.email, {
+      sessionSecret: config.sessionSecret,
+      registrationMode: config.registrationMode,
+    });
+    if (!user || user === 'registration_closed') {
       return c.html(
         page('Sign-in failed', 'Something went wrong. Try again from the home page.'),
         500,
@@ -70,7 +81,7 @@ async function handle(c: Ctx, token: string, method: 'GET' | 'POST') {
   }
 
   // Magic-link sign-in for existing users (e.g. reminder footer).
-  const magic = await verifyMagicLink(c.env.ACTION_TOKEN_SECRET, token);
+  const magic = await verifyMagicLink(config.actionTokenSecret, token);
   if (magic) {
     const db = getDb(c.env);
     const user = (await db.select().from(users).where(eq(users.id, magic.uid)).limit(1))[0];
@@ -80,12 +91,12 @@ async function handle(c: Ctx, token: string, method: 'GET' | 'POST') {
         410,
       );
     }
-    const session = await signSession(c.env.SESSION_SECRET, user.id);
+    const session = await signSession(config.sessionSecret, user.id);
     writeSessionCookie(c, session);
     return c.redirect('/', 302);
   }
 
-  const fire = await verifyFireAction(c.env.ACTION_TOKEN_SECRET, token);
+  const fire = await verifyFireAction(config.actionTokenSecret, token);
   if (!fire) {
     return c.html(page('Link invalid or expired', 'This action link is no longer valid.'), 410);
   }

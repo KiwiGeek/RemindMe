@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, type CurrentUser, api } from '../api';
+import { AppearanceSettings } from './AppearanceSettings';
 import { PasskeysSection } from './PasskeysSection';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -149,6 +150,7 @@ export function Settings({ user, onUserChanged, onExit, onLoggedOut }: Props) {
         )}
       </section>
 
+      <AppearanceSettings />
       <PasskeysSection />
     </main>
   );

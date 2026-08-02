@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { getDb } from '~/db/client';
 import { RETENTION_DAYS, pruneOldRows } from '~/lib/retention';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -48,13 +49,13 @@ describe('retention pruning', () => {
     const uid = await insertUser();
     const rid = await insertReminder(uid);
     const now = new Date('2026-06-01T00:00:00Z');
-    const oldDate = new Date(now.getTime() - 60 * DAY_MS).toISOString(); // 60d old
-    const recentDate = new Date(now.getTime() - 5 * DAY_MS).toISOString(); // 5d old
+    const oldDate = new Date(now.getTime() - 60 * DAY_MS).toISOString();
+    const recentDate = new Date(now.getTime() - 5 * DAY_MS).toISOString();
 
     await insertFire(rid, oldDate, 'sent');
     await insertFire(rid, recentDate, 'sent');
 
-    const result = await pruneOldRows(env, now);
+    const result = await pruneOldRows(getDb(env), now);
     expect(result.firesDeleted).toBe(1);
 
     const remaining = await env.DB.prepare(
@@ -67,8 +68,6 @@ describe('retention pruning', () => {
     const uid = await insertUser();
     const rid = await insertReminder(uid);
     const now = new Date('2026-06-01T00:00:00Z');
-    // Three distinct fire_at values so the UNIQUE(reminder_id, fire_at)
-    // constraint isn't tripped — all old enough to be prune candidates.
     const old1 = new Date(now.getTime() - 90 * DAY_MS).toISOString();
     const old2 = new Date(now.getTime() - 91 * DAY_MS).toISOString();
     const old3 = new Date(now.getTime() - 92 * DAY_MS).toISOString();
@@ -77,8 +76,8 @@ describe('retention pruning', () => {
     await insertFire(rid, old2, 'failed');
     await insertFire(rid, old3, 'skipped');
 
-    const result = await pruneOldRows(env, now);
-    expect(result.firesDeleted).toBe(1); // only the 'skipped' one
+    const result = await pruneOldRows(getDb(env), now);
+    expect(result.firesDeleted).toBe(1);
 
     const remaining = await env.DB.prepare(
       'SELECT status FROM reminder_fires ORDER BY status',
@@ -91,7 +90,7 @@ describe('retention pruning', () => {
     await insertAudit('old', new Date(now.getTime() - 60 * DAY_MS).toISOString());
     await insertAudit('recent', new Date(now.getTime() - 1 * DAY_MS).toISOString());
 
-    const result = await pruneOldRows(env, now);
+    const result = await pruneOldRows(getDb(env), now);
     expect(result.auditDeleted).toBe(1);
 
     const remaining = await env.DB.prepare('SELECT event FROM audit_log').all<{ event: string }>();
@@ -105,7 +104,7 @@ describe('retention pruning', () => {
     const rid = await insertReminder(uid);
     await insertFire(rid, now.toISOString(), 'sent');
 
-    const result = await pruneOldRows(env, now);
+    const result = await pruneOldRows(getDb(env), now);
     expect(result).toEqual({ firesDeleted: 0, auditDeleted: 0 });
   });
 
@@ -113,12 +112,10 @@ describe('retention pruning', () => {
     const now = new Date('2026-06-01T00:00:00Z');
     await insertAudit('a', new Date(now.getTime() - 10 * DAY_MS).toISOString());
 
-    // Default retention (30d) keeps it.
-    let result = await pruneOldRows(env, now);
+    let result = await pruneOldRows(getDb(env), now);
     expect(result.auditDeleted).toBe(0);
 
-    // 5d retention drops it.
-    result = await pruneOldRows(env, now, 5);
+    result = await pruneOldRows(getDb(env), now, 5);
     expect(result.auditDeleted).toBe(1);
   });
 

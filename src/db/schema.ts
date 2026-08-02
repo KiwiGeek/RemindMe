@@ -9,6 +9,8 @@ export const users = sqliteTable('users', {
   status: text('status', { enum: ['active', 'suspended'] })
     .notNull()
     .default('active'),
+  /** 1 = admin; set by setup wizard / admin promote (replaces ADMIN_EMAILS). */
+  isAdmin: integer('is_admin').notNull().default(0),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
 
@@ -128,5 +130,58 @@ export const auditLog = sqliteTable(
   },
   (t) => ({
     userIdx: index('idx_audit_user').on(t.userId, t.occurredAt),
+  }),
+);
+
+export const registrationModeValues = ['open', 'closed'] as const;
+export type RegistrationMode = (typeof registrationModeValues)[number];
+
+export const mailProviderValues = ['mailgun', 'smtp'] as const;
+export type MailProvider = (typeof mailProviderValues)[number];
+
+/** Single-row operator settings (id is always 1). Secrets stored encrypted. */
+export const appSettings = sqliteTable('app_settings', {
+  id: integer('id').primaryKey().default(1),
+  setupCompletedAt: text('setup_completed_at'),
+  appName: text('app_name').notNull().default('Remind Me'),
+  siteOrigin: text('site_origin').notNull().default(''),
+  mailProvider: text('mail_provider', { enum: mailProviderValues }).notNull().default('mailgun'),
+  mailgunRegion: text('mailgun_region', { enum: ['us', 'eu'] })
+    .notNull()
+    .default('us'),
+  mailgunDomain: text('mailgun_domain').notNull().default(''),
+  /** From address — used by both Mailgun and SMTP. */
+  mailgunFrom: text('mailgun_from').notNull().default(''),
+  /** Reply-To — used by both Mailgun and SMTP. */
+  mailgunReplyTo: text('mailgun_reply_to').notNull().default(''),
+  mailgunApiKeyEnc: text('mailgun_api_key_enc').notNull().default(''),
+  mailgunSigningKeyEnc: text('mailgun_signing_key_enc').notNull().default(''),
+  smtpHost: text('smtp_host').notNull().default(''),
+  smtpPort: integer('smtp_port').notNull().default(587),
+  smtpSecure: integer('smtp_secure').notNull().default(0),
+  smtpUser: text('smtp_user').notNull().default(''),
+  smtpPassEnc: text('smtp_pass_enc').notNull().default(''),
+  sessionSecretEnc: text('session_secret_enc').notNull().default(''),
+  otpPepperEnc: text('otp_pepper_enc').notNull().default(''),
+  actionTokenSecretEnc: text('action_token_secret_enc').notNull().default(''),
+  registrationMode: text('registration_mode', { enum: registrationModeValues })
+    .notNull()
+    .default('open'),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+});
+
+export type AppSettingsRow = typeof appSettings.$inferSelect;
+
+/** Docker/Node ephemeral store (OTP, rate limits, etc.). */
+export const kvEntries = sqliteTable(
+  'kv_entries',
+  {
+    key: text('key').primaryKey(),
+    value: text('value').notNull(),
+    /** Unix seconds; null = no expiry. */
+    expiresAt: integer('expires_at'),
+  },
+  (t) => ({
+    expiresIdx: index('idx_kv_expires').on(t.expiresAt),
   }),
 );

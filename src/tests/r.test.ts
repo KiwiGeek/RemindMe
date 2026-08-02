@@ -5,6 +5,12 @@ import { getDb } from '~/db/client';
 import { reminderFires, reminders, users } from '~/db/schema';
 import { signFireAction, signMagicLink } from '~/lib/actionToken';
 
+function actionSecret(): string {
+  const s = env.ACTION_TOKEN_SECRET;
+  if (!s) throw new Error('missing ACTION_TOKEN_SECRET');
+  return s;
+}
+
 interface SeedOpts {
   email?: string;
   rrule?: string;
@@ -96,7 +102,7 @@ describe('snooze', () => {
       nextFireAt: '2026-05-26T08:00:00Z',
     });
     const before = Date.now();
-    const token = await signFireAction(env.ACTION_TOKEN_SECRET, {
+    const token = await signFireAction(actionSecret(), {
       rid: reminder.id,
       fid: fire.id,
       op: 'snooze:1h',
@@ -122,7 +128,7 @@ describe('skip', () => {
     const { reminder, fire } = await seedFiringReminder({
       nextFireAt: '2026-05-26T08:00:00Z',
     });
-    const token = await signFireAction(env.ACTION_TOKEN_SECRET, {
+    const token = await signFireAction(actionSecret(), {
       rid: reminder.id,
       fid: fire.id,
       op: 'skip',
@@ -139,7 +145,7 @@ describe('skip', () => {
       nextFireAt: '2026-05-26T08:00:00Z',
       remainingCount: 1,
     });
-    const token = await signFireAction(env.ACTION_TOKEN_SECRET, {
+    const token = await signFireAction(actionSecret(), {
       rid: reminder.id,
       fid: fire.id,
       op: 'skip',
@@ -157,7 +163,7 @@ describe('skip', () => {
 describe('done', () => {
   it('GET shows a confirm page; POST applies', async () => {
     const { reminder, fire } = await seedFiringReminder();
-    const token = await signFireAction(env.ACTION_TOKEN_SECRET, {
+    const token = await signFireAction(actionSecret(), {
       rid: reminder.id,
       fid: fire.id,
       op: 'done',
@@ -183,7 +189,7 @@ describe('done', () => {
 describe('unsub (one-click List-Unsubscribe)', () => {
   it('POST completes the series without a confirm step', async () => {
     const { reminder, fire } = await seedFiringReminder();
-    const token = await signFireAction(env.ACTION_TOKEN_SECRET, {
+    const token = await signFireAction(actionSecret(), {
       rid: reminder.id,
       fid: fire.id,
       op: 'unsub',
@@ -199,7 +205,7 @@ describe('unsub (one-click List-Unsubscribe)', () => {
 describe('idempotency', () => {
   it("a second use of the same fire's token reports already-actioned", async () => {
     const { reminder, fire } = await seedFiringReminder();
-    const skipToken = await signFireAction(env.ACTION_TOKEN_SECRET, {
+    const skipToken = await signFireAction(actionSecret(), {
       rid: reminder.id,
       fid: fire.id,
       op: 'skip',
@@ -208,7 +214,7 @@ describe('idempotency', () => {
     expect(first.status).toBe(200);
 
     // Different op token, same fire — should also be locked out.
-    const snoozeToken = await signFireAction(env.ACTION_TOKEN_SECRET, {
+    const snoozeToken = await signFireAction(actionSecret(), {
       rid: reminder.id,
       fid: fire.id,
       op: 'snooze:1d',
@@ -222,7 +228,7 @@ describe('idempotency', () => {
 describe('magic link', () => {
   it('signs the user in and redirects to /', async () => {
     const { user } = await seedFiringReminder();
-    const token = await signMagicLink(env.ACTION_TOKEN_SECRET, user.id);
+    const token = await signMagicLink(actionSecret(), user.id);
     const res = await fetchAction(token);
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe('/');
@@ -240,7 +246,7 @@ describe('magic link', () => {
 
   it('refuses a magic link for a suspended user', async () => {
     const { user } = await seedFiringReminder({ userStatus: 'suspended' });
-    const token = await signMagicLink(env.ACTION_TOKEN_SECRET, user.id);
+    const token = await signMagicLink(actionSecret(), user.id);
     const res = await fetchAction(token);
     expect(res.status).toBe(410);
   });

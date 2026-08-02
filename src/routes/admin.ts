@@ -43,6 +43,43 @@ const createUserBody = z.object({
   timezone: z.string().min(1).max(64).optional(),
 });
 
+const patchSettingsBody = z.object({
+  appName: z.string().trim().min(1).max(100).optional(),
+  siteOrigin: z.string().url().optional(),
+  mailProvider: z.enum(['mailgun', 'smtp']).optional(),
+  mailgunRegion: z.enum(['us', 'eu']).optional(),
+  mailgunDomain: z.string().trim().optional(),
+  mailgunFrom: z.string().trim().min(1).optional(),
+  mailgunReplyTo: z.string().trim().min(1).optional(),
+  mailgunApiKey: z.string().optional(),
+  mailgunSigningKey: z.string().optional(),
+  smtpHost: z.string().trim().optional(),
+  smtpPort: z.number().int().min(1).max(65535).optional(),
+  smtpSecure: z.boolean().optional(),
+  smtpUser: z.string().optional(),
+  smtpPass: z.string().optional(),
+  registrationMode: z.enum(['open', 'closed']).optional(),
+});
+
+const testEmailBody = z.object({
+  to: z.string().email().optional(),
+});
+
+const promoteAdminBody = z.object({
+  isAdmin: z.boolean(),
+});
+
+const exportBody = z.object({
+  /** Empty / omitted → plain JSON export; otherwise passphrase-wrapped. */
+  passphrase: z.string().optional(),
+});
+
+const importAdminBody = z.object({
+  passphrase: z.string().optional(),
+  bundle: z.unknown(),
+  confirm: z.literal(true),
+});
+
 const patchUserBody = z
   .object({
     /** Only timezone is mutable from the admin UI for now. */
@@ -76,7 +113,7 @@ export const admin = new Hono<AppBindings>()
       .orderBy(desc(users.createdAt))
       .limit(limit)
       .offset(offset);
-    return c.json({ users: rows.map((u) => presentUser(c.env, u)) });
+    return c.json({ users: rows.map((u) => presentUser(u)) });
   })
 
   .post('/users', zValidator('json', createUserBody), async (c) => {
@@ -89,7 +126,7 @@ export const admin = new Hono<AppBindings>()
     const existing = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
     if (existing) {
       // Don't silently merge — let the admin decide what to do.
-      return c.json({ error: 'user_exists', user: presentUser(c.env, existing) }, 409);
+      return c.json({ error: 'user_exists', user: presentUser(existing) }, 409);
     }
 
     const inserted = await db
@@ -110,13 +147,13 @@ export const admin = new Hono<AppBindings>()
       change: { email: created.email, timezone: created.timezone },
     });
 
-    return c.json({ user: presentUser(c.env, created) }, 201);
+    return c.json({ user: presentUser(created) }, 201);
   })
 
   .get('/users/:id{[0-9]+}', async (c) => {
     const db = getDb(c.env);
     const user = await loadTargetUser(db, Number(c.req.param('id')));
-    return c.json({ user: presentUser(c.env, user) });
+    return c.json({ user: presentUser(user) });
   })
 
   .patch('/users/:id{[0-9]+}', zValidator('json', patchUserBody), async (c) => {
@@ -134,7 +171,7 @@ export const admin = new Hono<AppBindings>()
       patch.timezone = timezone;
     }
     if (Object.keys(patch).length === 0) {
-      return c.json({ user: presentUser(c.env, existing) });
+      return c.json({ user: presentUser(existing) });
     }
 
     const updated = (await db.update(users).set(patch).where(eq(users.id, id)).returning())[0];
@@ -145,7 +182,7 @@ export const admin = new Hono<AppBindings>()
       target_user_id: id,
       change: { from: existing.timezone, to: updated.timezone },
     });
-    return c.json({ user: presentUser(c.env, updated) });
+    return c.json({ user: presentUser(updated) });
   })
 
   // ---- reminders for a specific user ----------------------------------------
@@ -360,4 +397,177 @@ export const admin = new Hono<AppBindings>()
       reminder_id: rid,
     });
     return c.body(null, 204);
+  })
+
+  .get('/settings', async (c) => {
+    const config = c.get('config');
+    if (!config) return c.json({ error: 'setup_required' }, 503);
+    const { toPublicConfig, smtpAllowed } = await import('~/lib/config');
+    return c.json({ settings: toPublicConfig(config), smtpAllowed: smtpAllowed(c.env) }, 200, {
+      'Cache-Control': 'no-store',
+    });
+  })
+
+  .patch('/settings', zValidator('json', patchSettingsBody), async (c) => {
+    const config = c.get('config');
+    if (!config) return c.json({ error: 'setup_required' }, 503);
+    const body = c.req.valid('json');
+    const db = getDb(c.env);
+    const { writeSettings, loadConfig, toPublicConfig, smtpAllowed, invalidateConfigCache } =
+      await import('~/lib/config');
+    const { validateMailSettings } = await import('~/lib/mail/validate');
+
+    const nextMail = {
+      mailProvider: body.mailProvider ?? config.mailProvider,
+      mailgunRegion: body.mailgunRegion ?? config.mailgunRegion,
+      mailgunDomain: body.mailgunDomain ?? config.mailgunDomain,
+      mailgunFrom: body.mailgunFrom ?? config.mailgunFrom,
+      mailgunReplyTo: body.mailgunReplyTo ?? config.mailgunReplyTo,
+      mailgunApiKey: body.mailgunApiKey ?? config.mailgunApiKey,
+      mailgunSigningKey: body.mailgunSigningKey ?? config.mailgunSigningKey,
+      smtpHost: body.smtpHost ?? config.smtpHost,
+      smtpPort: body.smtpPort ?? config.smtpPort,
+      smtpSecure: body.smtpSecure ?? config.smtpSecure,
+      smtpUser: body.smtpUser ?? config.smtpUser,
+      smtpPass: body.smtpPass ?? config.smtpPass,
+    };
+    const mailErr = validateMailSettings(c.env, nextMail);
+    if (mailErr) return c.json({ error: mailErr }, 400);
+
+    await writeSettings(db, c.env.INSTANCE_SECRET, {
+      appName: body.appName ?? config.appName,
+      siteOrigin: (body.siteOrigin ?? config.siteOrigin).replace(/\/$/, ''),
+      ...nextMail,
+      sessionSecret: config.sessionSecret,
+      otpPepper: config.otpPepper,
+      actionTokenSecret: config.actionTokenSecret,
+      registrationMode: body.registrationMode ?? config.registrationMode,
+      setupCompletedAt: config.setupCompletedAt,
+    });
+
+    invalidateConfigCache();
+    const next = await loadConfig(db, c.env.INSTANCE_SECRET);
+    c.set('config', next);
+    await writeAudit(db, 'admin_settings_update', {
+      admin_user_id: c.get('userId'),
+      change: { keys: Object.keys(body) },
+    });
+    if (!next) return c.json({ error: 'internal' }, 500);
+    return c.json({ settings: toPublicConfig(next), smtpAllowed: smtpAllowed(c.env) }, 200, {
+      'Cache-Control': 'no-store',
+    });
+  })
+
+  .post('/settings/test-email', zValidator('json', testEmailBody), async (c) => {
+    const config = c.get('config');
+    if (!config) return c.json({ error: 'setup_required' }, 503);
+    const { to } = c.req.valid('json');
+    const db = getDb(c.env);
+    const adminUser = (
+      await db
+        .select()
+        .from(users)
+        .where(eq(users.id, c.get('userId')))
+        .limit(1)
+    )[0];
+    const dest = to ?? adminUser?.email;
+    if (!dest) return c.json({ error: 'no_recipient' }, 400);
+
+    const { createMailTransport } = await import('~/lib/mail/createTransport');
+    const { MailTransportError } = await import('~/lib/mail/transport');
+    const mail = await createMailTransport(config, c.env);
+    try {
+      await mail.send({
+        to: dest,
+        subject: `[${config.appName}] Test email`,
+        text: `This is a test message from ${config.appName}. If you received it, mail is configured correctly.`,
+        html: `<p>This is a test message from <strong>${config.appName}</strong>. If you received it, mail is configured correctly.</p>`,
+        tags: ['test'],
+      });
+      await writeAudit(db, 'admin_test_email', {
+        admin_user_id: c.get('userId'),
+        to: dest,
+      });
+      return c.json({ ok: true, to: dest });
+    } catch (err) {
+      const message =
+        err instanceof MailTransportError
+          ? `${err.message}: ${err.body.slice(0, 300)}`
+          : String(err);
+      return c.json({ error: 'send_failed', detail: message }, 502);
+    }
+  })
+
+  .patch('/users/:id{[0-9]+}/admin', zValidator('json', promoteAdminBody), async (c) => {
+    const id = Number(c.req.param('id'));
+    const { isAdmin } = c.req.valid('json');
+    const db = getDb(c.env);
+    const target = await loadTargetUser(db, id);
+    if (target.id === c.get('userId') && !isAdmin) {
+      return c.json({ error: 'cannot_demote_self' }, 400);
+    }
+    const updated = (
+      await db
+        .update(users)
+        .set({ isAdmin: isAdmin ? 1 : 0 })
+        .where(eq(users.id, id))
+        .returning()
+    )[0];
+    if (!updated) throw new HTTPException(500, { message: 'update_failed' });
+    await writeAudit(db, 'admin_user_promote', {
+      admin_user_id: c.get('userId'),
+      target_user_id: id,
+      change: { isAdmin },
+    });
+    return c.json({ user: presentUser(updated) });
+  })
+
+  .post('/export', zValidator('json', exportBody), async (c) => {
+    const config = c.get('config');
+    if (!config) return c.json({ error: 'setup_required' }, 503);
+    const { passphrase } = c.req.valid('json');
+    const db = getDb(c.env);
+    const { exportInstanceBundle } = await import('~/lib/transfer');
+    const pass = passphrase?.trim() ?? '';
+    if (pass.length > 0 && pass.length < 8) {
+      return c.json({ error: 'passphrase_too_short' }, 400);
+    }
+    const bundle = await exportInstanceBundle(
+      db,
+      c.env.INSTANCE_SECRET,
+      config,
+      pass.length > 0 ? pass : null,
+    );
+    await writeAudit(db, 'admin_export', { admin_user_id: c.get('userId') });
+    return c.json({ bundle }, 200, {
+      'Cache-Control': 'no-store',
+      'Content-Disposition': 'attachment; filename="remindme-export.json"',
+    });
+  })
+
+  .post('/import', zValidator('json', importAdminBody), async (c) => {
+    const { passphrase, bundle, confirm } = c.req.valid('json');
+    if (!confirm) return c.json({ error: 'confirm_required' }, 400);
+    const db = getDb(c.env);
+    const { importInstanceBundle } = await import('~/lib/transfer');
+    try {
+      await importInstanceBundle(db, c.env.INSTANCE_SECRET, bundle, passphrase, {
+        smtpAllowed: (await import('~/lib/config')).smtpAllowed(c.env),
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg === 'passphrase_required') {
+        return c.json({ error: 'passphrase_required' }, 400);
+      }
+      if (msg === 'smtp_not_supported') {
+        return c.json({ error: 'smtp_not_supported' }, 400);
+      }
+      console.error('admin import failed', err);
+      return c.json({ error: 'import_failed' }, 400);
+    }
+    const { loadConfig } = await import('~/lib/config');
+    const next = await loadConfig(db, c.env.INSTANCE_SECRET);
+    c.set('config', next);
+    await writeAudit(db, 'admin_import', { admin_user_id: c.get('userId') });
+    return c.json({ ok: true });
   });

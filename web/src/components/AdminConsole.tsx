@@ -17,6 +17,7 @@ import {
 } from '../api';
 import { ReminderForm, adminClient } from './ReminderForm';
 import { RemindersList, adminListClient } from './RemindersList';
+import { OperatorSettings } from './OperatorSettings';
 import { ThemeToggle } from './ThemeToggle';
 
 interface Props {
@@ -26,6 +27,8 @@ interface Props {
   onEnterSettings?: () => void;
 }
 
+type Tab = 'users' | 'instance';
+
 type View =
   | { kind: 'users' }
   | { kind: 'create_user' }
@@ -34,6 +37,7 @@ type View =
 type UserMode = { kind: 'list' } | { kind: 'new' } | { kind: 'edit'; reminder: Reminder };
 
 export function AdminConsole({ admin, onExit, onLoggedOut, onEnterSettings }: Props) {
+  const [tab, setTab] = useState<Tab>('users');
   const [view, setView] = useState<View>({ kind: 'users' });
   const [busy, setBusy] = useState(false);
 
@@ -83,21 +87,48 @@ export function AdminConsole({ admin, onExit, onLoggedOut, onEnterSettings }: Pr
         </div>
       </header>
 
-      {view.kind === 'users' && (
+      <div class="flex gap-2 text-sm">
+        <button
+          type="button"
+          class={`rounded-lg px-3 py-1.5 font-medium ${
+            tab === 'users'
+              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+              : 'ui-btn-secondary'
+          }`}
+          onClick={() => setTab('users')}
+        >
+          Users
+        </button>
+        <button
+          type="button"
+          class={`rounded-lg px-3 py-1.5 font-medium ${
+            tab === 'instance'
+              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+              : 'ui-btn-secondary'
+          }`}
+          onClick={() => setTab('instance')}
+        >
+          Instance
+        </button>
+      </div>
+
+      {tab === 'instance' && <OperatorSettings />}
+
+      {tab === 'users' && view.kind === 'users' && (
         <UsersList
           onPick={(user) => setView({ kind: 'user', user, mode: { kind: 'list' } })}
           onCreate={() => setView({ kind: 'create_user' })}
         />
       )}
 
-      {view.kind === 'create_user' && (
+      {tab === 'users' && view.kind === 'create_user' && (
         <CreateUserPanel
           onCancel={() => setView({ kind: 'users' })}
           onCreated={(user) => setView({ kind: 'user', user, mode: { kind: 'list' } })}
         />
       )}
 
-      {view.kind === 'user' && (
+      {tab === 'users' && view.kind === 'user' && (
         <UserPanel
           target={view.user}
           mode={view.mode}

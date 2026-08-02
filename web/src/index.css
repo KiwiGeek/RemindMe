@@ -130,3 +130,136 @@ body {
  * script in `index.html` applies the right class before React paints so
  * there's no flash of the wrong theme. */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Visual palettes remap the zinc scale (what the UI is built on) so every
+ * existing `zinc-*` / `dark:zinc-*` utility picks up the active look.
+ * `data-palette` is set on <html> by usePalette + the FOUC script.
+ * Default / missing = zinc (Tailwind built-ins, no overrides).
+ */
+
+[data-palette='slate'] {
+  --color-zinc-50: #f8fafc;
+  --color-zinc-100: #f1f5f9;
+  --color-zinc-200: #e2e8f0;
+  --color-zinc-300: #cbd5e1;
+  --color-zinc-400: #94a3b8;
+  --color-zinc-500: #64748b;
+  --color-zinc-600: #475569;
+  --color-zinc-700: #334155;
+  --color-zinc-800: #1e293b;
+  --color-zinc-900: #0f172a;
+  --color-zinc-950: #020617;
+}
+
+[data-palette='stone'] {
+  --color-zinc-50: #fafaf9;
+  --color-zinc-100: #f5f5f4;
+  --color-zinc-200: #e7e5e4;
+  --color-zinc-300: #d6d3d1;
+  --color-zinc-400: #a8a29e;
+  --color-zinc-500: #78716c;
+  --color-zinc-600: #57534e;
+  --color-zinc-700: #44403c;
+  --color-zinc-800: #292524;
+  --color-zinc-900: #1c1917;
+  --color-zinc-950: #0c0a09;
+}
+
+[data-palette='graphite'] {
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+}
+
+[data-palette='sage'] {
+  --color-zinc-50: #f6f7f4;
+  --color-zinc-100: #eceee8;
+  --color-zinc-200: #d5d9ce;
+  --color-zinc-300: #b4bca8;
+  --color-zinc-400: #8b9578;
+  --color-zinc-500: #6b7460;
+  --color-zinc-600: #545c4b;
+  --color-zinc-700: #434a3c;
+  --color-zinc-800: #373d33;
+  --color-zinc-900: #2f332c;
+  --color-zinc-950: #181b16;
+}
+
+[data-palette='forest'] {
+  --color-zinc-50: #f3f6f2;
+  --color-zinc-100: #e4ebe2;
+  --color-zinc-200: #c5d3c1;
+  --color-zinc-300: #9bb396;
+  --color-zinc-400: #6f8c6a;
+  --color-zinc-500: #557050;
+  --color-zinc-600: #435a40;
+  --color-zinc-700: #374a35;
+  --color-zinc-800: #2e3d2d;
+  --color-zinc-900: #273326;
+  --color-zinc-950: #131b13;
+}
+
+[data-palette='ocean'] {
+  --color-zinc-50: #f4f7fb;
+  --color-zinc-100: #e8eef6;
+  --color-zinc-200: #cdd9e8;
+  --color-zinc-300: #a8bdd4;
+  --color-zinc-400: #7a96b5;
+  --color-zinc-500: #5a7696;
+  --color-zinc-600: #465d7a;
+  --color-zinc-700: #394b63;
+  --color-zinc-800: #314054;
+  --color-zinc-900: #2a3748;
+  --color-zinc-950: #1a222e;
+}
+
+[data-palette='mist'] {
+  --color-zinc-50: #f5f9fc;
+  --color-zinc-100: #eaf2f8;
+  --color-zinc-200: #d3e4f0;
+  --color-zinc-300: #b0cde0;
+  --color-zinc-400: #82adc8;
+  --color-zinc-500: #5f8fad;
+  --color-zinc-600: #4a7390;
+  --color-zinc-700: #3e5e76;
+  --color-zinc-800: #365063;
+  --color-zinc-900: #304454;
+  --color-zinc-950: #1e2c37;
+}
+
+[data-palette='dusk'] {
+  --color-zinc-50: #f6f6fb;
+  --color-zinc-100: #ececf6;
+  --color-zinc-200: #d8d8eb;
+  --color-zinc-300: #b8b8d6;
+  --color-zinc-400: #8f8fb8;
+  --color-zinc-500: #6f6f9a;
+  --color-zinc-600: #58587c;
+  --color-zinc-700: #484865;
+  --color-zinc-800: #3d3d55;
+  --color-zinc-900: #353549;
+  --color-zinc-950: #22222f;
+}
+
+[data-palette='clay'] {
+  --color-zinc-50: #faf7f5;
+  --color-zinc-100: #f3ece8;
+  --color-zinc-200: #e6d7cf;
+  --color-zinc-300: #d2b8ab;
+  --color-zinc-400: #b58f7d;
+  --color-zinc-500: #9a7260;
+  --color-zinc-600: #7f5b4c;
+  --color-zinc-700: #684b40;
+  --color-zinc-800: #574038;
+  --color-zinc-900: #4a3731;
+  --color-zinc-950: #291e1b;
+}

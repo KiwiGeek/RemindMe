@@ -1,21 +1,8 @@
 /**
- * One-shot, fail-loud-but-don't-crash startup check. Run once per isolate
- * (cheap — we cache the result) and log a single warning line listing every
- * secret that's missing or still set to the `.dev.vars.example` placeholder.
- *
- * Designed for the developer footgun where `wrangler secret put` was used
- * but `.dev.vars` wasn't touched — Mailgun calls 401 with no context.
+ * Fail-loud bootstrap check for INSTANCE_SECRET (and optional SETUP_TOKEN note).
  */
 
 import type { Env } from '~/env';
-
-const PLACEHOLDERS: Record<string, string> = {
-  MAILGUN_API_KEY: 'key-replace-me',
-  MAILGUN_SIGNING_KEY: 'replace-me',
-  SESSION_SECRET: 'generate-with-openssl-rand-hex-32',
-  OTP_PEPPER: 'generate-with-openssl-rand-hex-32',
-  ACTION_TOKEN_SECRET: 'generate-with-openssl-rand-hex-32',
-};
 
 let checked = false;
 
@@ -24,21 +11,19 @@ export function checkEnv(env: Env): void {
   checked = true;
 
   const problems: string[] = [];
-  for (const [key, placeholder] of Object.entries(PLACEHOLDERS)) {
-    const value = env[key as keyof Env];
-    if (typeof value !== 'string' || value.length === 0) {
-      problems.push(`${key}: missing`);
-    } else if (value === placeholder) {
-      problems.push(`${key}: still the .dev.vars.example placeholder`);
-    }
+  if (typeof env.INSTANCE_SECRET !== 'string' || env.INSTANCE_SECRET.length < 16) {
+    problems.push('INSTANCE_SECRET: missing or too short (need ≥16 chars)');
+  }
+  if (env.INSTANCE_SECRET === 'generate-with-openssl-rand-hex-32') {
+    problems.push('INSTANCE_SECRET: still the placeholder');
   }
 
   if (problems.length > 0) {
     console.warn(
       [
-        '[remindme] one or more secrets are misconfigured — Mailgun + session features will fail:',
+        '[remindme] bootstrap misconfigured — setup and encrypted settings will fail:',
         ...problems.map((p) => `  - ${p}`),
-        '  Set them in .dev.vars (for `wrangler dev`) and/or via `wrangler secret put <NAME>` (for production).',
+        '  Set INSTANCE_SECRET in .dev.vars (Workers local), wrangler secret, or Docker .env.',
       ].join('\n'),
     );
   }

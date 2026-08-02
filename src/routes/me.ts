@@ -5,15 +5,9 @@ import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { getDb } from '~/db/client';
 import { type User, users } from '~/db/schema';
-import type { AppBindings, Env } from '~/env';
-import { isAdminEmail } from '~/lib/admin';
+import type { AppBindings } from '~/env';
 import { requireAuth } from '~/lib/auth';
 
-/**
- * IANA timezone validation: lean on the runtime's tz database via
- * `Intl.supportedValuesOf('timeZone')` when available, otherwise probe
- * with `Intl.DateTimeFormat`. Workers' V8 supports both.
- */
 function isValidTimeZone(tz: string): boolean {
   if (typeof Intl.supportedValuesOf === 'function') {
     return Intl.supportedValuesOf('timeZone').includes(tz);
@@ -31,14 +25,14 @@ const patchBody = z.object({
   tzConfirmed: z.boolean().optional(),
 });
 
-export function presentUser(env: Env, user: User) {
+export function presentUser(user: User) {
   return {
     id: user.id,
     email: user.email,
     timezone: user.timezone,
     tzConfirmed: user.tzConfirmed === 1,
     status: user.status,
-    isAdmin: isAdminEmail(env, user.email),
+    isAdmin: user.isAdmin === 1,
   };
 }
 
@@ -52,7 +46,7 @@ export const me = new Hono<AppBindings>()
     const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     const user = rows[0];
     if (!user) throw new HTTPException(401, { message: 'unauthorized' });
-    return c.json({ user: presentUser(c.env, user) });
+    return c.json({ user: presentUser(user) });
   })
   .patch('/', zValidator('json', patchBody), async (c) => {
     const { timezone, tzConfirmed } = c.req.valid('json');
@@ -72,5 +66,5 @@ export const me = new Hono<AppBindings>()
     const updated = await db.update(users).set(patch).where(eq(users.id, userId)).returning();
     const user = updated[0];
     if (!user) throw new HTTPException(404, { message: 'not_found' });
-    return c.json({ user: presentUser(c.env, user) });
+    return c.json({ user: presentUser(user) });
   });

@@ -9,8 +9,8 @@
  * Reference: https://documentation.mailgun.com/docs/mailgun/user-manual/tracking-messages/webhooks
  */
 
-import type { Env } from '~/env';
 import { bytesToHex, timingSafeEqual } from '~/lib/crypto';
+import type { KvStore } from '~/platform/kv';
 
 /** Mailgun timestamps are unix seconds (string). Allow ±30 minutes for clock skew + replay. */
 const MAX_AGE_SECONDS = 30 * 60;
@@ -66,10 +66,10 @@ export async function verifyMailgunSignature(
  * is a no-op if already suspended). The dedupe is mostly to keep audit
  * log noise down on the long-tail of retries.
  */
-export async function dedupeMailgunToken(env: Env, token: string): Promise<boolean> {
+export async function dedupeMailgunToken(kv: KvStore, token: string): Promise<boolean> {
   const key = `mw:dedupe:${token}`;
-  const existing = await env.KV.get(key);
+  const existing = await kv.get(key);
   if (existing) return false;
-  await env.KV.put(key, '1', { expirationTtl: DEDUPE_TTL_SECONDS });
+  await kv.put(key, '1', { expirationTtl: DEDUPE_TTL_SECONDS });
   return true;
 }

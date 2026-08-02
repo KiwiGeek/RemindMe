@@ -134,7 +134,7 @@ export const passkeysRoute = new Hono<AppBindings>()
       }),
     });
 
-    await saveRegistrationChallenge(c.env, userId, options.challenge);
+    await saveRegistrationChallenge(c.get('kv'), userId, options.challenge);
     return c.json({ options });
   })
 
@@ -142,7 +142,7 @@ export const passkeysRoute = new Hono<AppBindings>()
     const userId = c.get('userId');
     const { response, nickname } = c.req.valid('json');
 
-    const expectedChallenge = await consumeRegistrationChallenge(c.env, userId);
+    const expectedChallenge = await consumeRegistrationChallenge(c.get('kv'), userId);
     if (!expectedChallenge) {
       return c.json({ error: 'challenge_expired' }, 400);
     }
@@ -232,7 +232,7 @@ export const passkeysRoute = new Hono<AppBindings>()
   .post('/auth/options', zValidator('json', authOptionsBody), async (c) => {
     const ip = clientIp(c);
     // Rate-limit cheap to make, but cheap to spam too. 60/hour/IP is plenty.
-    const limited = await rateLimit(c.env.KV, `pk:auth:opts:${ip}`, 60, 3600);
+    const limited = await rateLimit(c.get('kv'), `pk:auth:opts:${ip}`, 60, 3600);
     if (!limited.allowed) return c.json({ error: 'rate_limited' }, 429);
 
     const rp = getRpInfo(c);
@@ -242,13 +242,13 @@ export const passkeysRoute = new Hono<AppBindings>()
       // Discoverable credentials: do NOT pre-populate allowCredentials. The
       // browser will offer any passkey it knows about for this RP ID.
     });
-    await saveAuthenticationChallenge(c.env, options.challenge);
+    await saveAuthenticationChallenge(c.get('kv'), options.challenge);
     return c.json({ options });
   })
 
   .post('/auth/verify', zValidator('json', authVerifyBody), async (c) => {
     const ip = clientIp(c);
-    const limited = await rateLimit(c.env.KV, `pk:auth:verify:${ip}`, 30, 3600);
+    const limited = await rateLimit(c.get('kv'), `pk:auth:verify:${ip}`, 30, 3600);
     if (!limited.allowed) return c.json({ error: 'rate_limited' }, 429);
 
     const { response } = c.req.valid('json');
@@ -277,7 +277,7 @@ export const passkeysRoute = new Hono<AppBindings>()
       return c.json({ error: 'invalid_response' }, 400);
     }
 
-    const issued = await consumeAuthenticationChallenge(c.env, clientChallenge);
+    const issued = await consumeAuthenticationChallenge(c.get('kv'), clientChallenge);
     if (!issued) {
       return c.json({ error: 'challenge_expired' }, 400);
     }
@@ -345,8 +345,10 @@ export const passkeysRoute = new Hono<AppBindings>()
       })
       .where(eq(passkeys.id, cred.id));
 
-    const token = await signSession(c.env.SESSION_SECRET, user.id);
+    const sessionConfig = c.get('config');
+    if (!sessionConfig) return c.json({ error: 'setup_required' }, 503);
+    const token = await signSession(sessionConfig.sessionSecret, user.id);
     writeSessionCookie(c, token);
 
-    return c.json({ user: presentUser(c.env, user) });
+    return c.json({ user: presentUser(user) });
   });

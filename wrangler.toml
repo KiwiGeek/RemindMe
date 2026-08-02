@@ -17,24 +17,15 @@ directory = "./web/dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-# Plaintext, non-secret runtime configuration. Anything that varies per
-# deployment (sending domain, from address, admin allow-list, public
-# site origin) lives in secrets instead — see the list below.
+# Plaintext, non-secret defaults used before setup completes (overridden by
+# app_settings afterward). Secrets: INSTANCE_SECRET + SETUP_TOKEN only.
 [vars]
 APP_NAME = "Remind Me"
 MAILGUN_REGION = "us"
 
 # Secrets (set via `wrangler secret put <NAME>`):
-#   MAILGUN_API_KEY        - private Mailgun sending API key
-#   MAILGUN_SIGNING_KEY    - HTTP webhook signing key
-#   SESSION_SECRET         - HMAC key for session cookies
-#   OTP_PEPPER             - HMAC pepper for OTP code storage
-#   ACTION_TOKEN_SECRET    - HMAC key for email action URLs
-#   SITE_ORIGIN            - public URL of this deploy (used by CSRF + email links)
-#   MAILGUN_DOMAIN         - verified Mailgun sending domain
-#   MAILGUN_FROM           - "Display Name <addr@domain>" envelope for outgoing mail
-#   MAILGUN_REPLY_TO       - reply-to address (replies are discarded)
-#   ADMIN_EMAILS           - comma-separated, case-insensitive admin allow-list
+#   INSTANCE_SECRET  - seals encrypted app_settings (required)
+#   SETUP_TOKEN      - gates first-run wizard / empty import (required until setup)
 
 # D1 binding. The database is created with:
 #   npx wrangler d1 create remindme

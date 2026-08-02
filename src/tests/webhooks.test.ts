@@ -1,6 +1,12 @@
 import { SELF, env, fetchMock } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+function mailgunSigningKey(): string {
+  const s = env.MAILGUN_SIGNING_KEY;
+  if (!s) throw new Error('missing MAILGUN_SIGNING_KEY');
+  return s;
+}
+
 const MAILGUN_BASE = 'https://api.mailgun.net';
 
 function bodyToString(body: unknown): string {
@@ -77,7 +83,7 @@ function bytesToHex(bytes: Uint8Array): string {
 async function mintMailgunSig(token: string, timestamp: number): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(env.MAILGUN_SIGNING_KEY),
+    new TextEncoder().encode(mailgunSigningKey()),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign'],
